@@ -1,0 +1,14 @@
+Average ms: 34.6075
+Average fps: 28.8955
+Min ms: 3.01352e-07
+Max ms: 0.111503
+
+Average ms: 40.7631
+Average fps: 24.532
+Min ms: 0.0196783
+Max ms: 0.0446368
+
+Average ms: 32.1944
+Average fps: 31.0613
+Min ms: 0.0131218
+Max ms: 0.101956
