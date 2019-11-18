@@ -77,9 +77,6 @@
     <ClInclude Include="Scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BVH.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_impl_glfw.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -134,9 +131,6 @@
       <Filter>Source Files\IMGUI</Filter>
     </ClCompile>
     <ClCompile Include="Scene.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="BVH.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Bbox.cpp">

@@ -99,9 +99,6 @@
     <ClCompile Include="Bbox.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="BVH.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="Dependencies\glad-0.1.24\src\glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -136,7 +133,6 @@
   <ItemGroup>
     <ClInclude Include="assert_cuda.h" />
     <ClInclude Include="Bbox.h" />
-    <ClInclude Include="BVH.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="cuda_definitions.h" />
     <ClInclude Include="IMGUI\imconfig.h" />

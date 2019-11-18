@@ -3,10 +3,10 @@
 class Scene {
 public:
 	struct GPUScene {
-		CachedBVH CUDACachedBVH;
+		uint8_t* voxels;
 	} gpuScene;
 
-	uint8_t* voxels;
+	
 
 	void Load(const char path[]);
 

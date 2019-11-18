@@ -9,7 +9,7 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
-constexpr static int bvh_stack_size = 32;
+constexpr static int grid_size = 256;
 
 constexpr static float epsilon = 0.001f;
 

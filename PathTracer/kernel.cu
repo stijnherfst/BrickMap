@@ -122,6 +122,152 @@ struct Sphere {
 
 __constant__ Sphere spheres[NUM_SPHERES];
 
+__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene) {
+	glm::vec3 raydir, curpos;
+	curpos = ray.origin;
+	raydir = ray.direction;
+
+	// setup 3DDDA (double check reusability of primary ray data)
+	glm::vec3 cb, tmax, tdelta, cell;
+	cell = curpos;
+	int stepX, outX, X = (int)cell.x;
+	int stepY, outY, Y = (int)cell.y;
+	int stepZ, outZ, Z = (int)cell.z;
+
+	if ((X < 0) || (X >= grid_size) || (Y < 0) || (Y >= grid_size) || (Z < 0) || (Z >= grid_size))
+		return false;
+	if (raydir.x > 0) {
+		stepX = 1, outX = grid_size;
+		cb.x = (X + 1);
+	} else {
+		stepX = -1, outX = -1;
+		cb.x = X;
+	}
+	if (raydir.y > 0.0f) {
+		stepY = 1, outY = grid_size;
+		cb.y = (Y + 1);
+	} else {
+		stepY = -1, outY = -1;
+		cb.y = Y;
+	}
+	if (raydir.z > 0.0f) {
+		stepZ = 1, outZ = grid_size;
+		cb.z = (Z + 1);
+	} else {
+		stepZ = -1, outZ = -1;
+		cb.z = Z;
+	}
+	float rxr, ryr, rzr;
+	if (raydir.x != 0) {
+		rxr = 1.0f / raydir.x;
+		tmax.x = (cb.x - curpos.x) * rxr;
+		tdelta.x = stepX * rxr;
+	} else
+		tmax.x = 1000000;
+	if (raydir.y != 0) {
+		ryr = 1.0f / raydir.y;
+		tmax.y = (cb.y - curpos.y) * ryr;
+		tdelta.y = stepY * ryr;
+	} else
+		tmax.y = 1000000;
+	if (raydir.z != 0) {
+		rzr = 1.0f / raydir.z;
+		tmax.z = (cb.z - curpos.z) * rzr;
+		tdelta.z = stepZ * rzr;
+	} else
+		tmax.z = 1000000;
+	// start stepping
+
+	//return true;
+	// trace primary ray
+	while (1) {
+		//if (X > 16 && Y > 16 && X < 32 && Y < 32)
+		//	return true;
+		if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+			//printf("a");
+			return true;
+		}
+		if (tmax.x < tmax.y) {
+			if (tmax.x < tmax.z) {
+				X = X + stepX;
+				if (X == outX)
+					return false;
+				tmax.x += tdelta.x;
+			} else {
+				Z = Z + stepZ;
+				if (Z == outZ)
+					return false;
+				tmax.z += tdelta.z;
+			}
+		} else {
+			if (tmax.y < tmax.z) {
+				Y = Y + stepY;
+				if (Y == outY)
+					return false;
+				tmax.y += tdelta.y;
+			} else {
+				Z = Z + stepZ;
+				if (Z == outZ)
+					return false;
+				tmax.z += tdelta.z;
+			}
+		}
+	}
+
+//testloop:
+//	while (1) {
+//		/*list = grid[X + (Y << GRIDSHFT) + (Z << (GRIDSHFT * 2))];
+//		while (list) {
+//			Primitive* pr = list->GetPrimitive();
+//			int result;
+//			if (pr->GetLastRayID() != a_Ray.GetID())
+//				if (result = pr->Intersect(a_Ray, a_Dist)) {
+//					a_Prim = pr;
+//					retval = result;
+//				}
+//			list = list->GetNext();
+//		}*/
+//		if (scene.voxels[X + Y * 264 + Z * 264 * 264]) {
+//			return true;
+//		}
+//
+//		if (tmax.x < tmax.y) {
+//			if (tmax.x < tmax.z) {
+//				if (a_Dist < tmax.x)
+//					break;
+//				X = X + stepX;
+//				if (X == outX)
+//					break;
+//				tmax.x += tdelta.x;
+//			} else {
+//				if (a_Dist < tmax.z)
+//					break;
+//				Z = Z + stepZ;
+//				if (Z == outZ)
+//					break;
+//				tmax.z += tdelta.z;
+//			}
+//		} else {
+//			if (tmax.y < tmax.z) {
+//				if (a_Dist < tmax.y)
+//					break;
+//				Y = Y + stepY;
+//				if (Y == outY)
+//					break;
+//				tmax.y += tdelta.y;
+//			} else {
+//				if (a_Dist < tmax.z)
+//					break;
+//				Z = Z + stepZ;
+//				if (Z == outZ)
+//					break;
+//				tmax.z += tdelta.z;
+//			}
+//		}
+//	}
+	return false;
+}
+
 __device__ inline bool intersect_scene(RayQueue& ray, Scene::GPUScene sceneData) {
 	float d;
 	ray.distance = VERY_FAR;
@@ -135,7 +281,35 @@ __device__ inline bool intersect_scene(RayQueue& ray, Scene::GPUScene sceneData)
 		}
 	}
 
+
+	if (intersect_voxel(ray, sceneData)) {
+		ray.identifier = 0;
+		ray.geometry_type == GeometryType::Triangle;
+		ray.distance = 1;
+		return true;
+	}
+
+
 	//if (sceneData.CUDACachedBVH.intersect(ray)) {
+	//	ray.geometry_type = GeometryType::Triangle;
+	//}
+	return ray.distance < VERY_FAR;
+}
+
+__device__ inline bool intersect_scene_DEBUG(RayQueue& ray, Scene::GPUScene sceneData, int* traversals) {
+	float d;
+	ray.distance = VERY_FAR;
+
+	for (int i = NUM_SPHERES; i--;) {
+		//d = spheres[i].intersect(ray);
+		if ((d = spheres[i].intersect(ray)) && d < ray.distance) {
+			ray.distance = d;
+			ray.identifier = i;
+			ray.geometry_type = GeometryType::Sphere;
+		}
+	}
+
+	//if (sceneData.CUDACachedBVH.intersect_debug(ray, traversals)) {
 	//	ray.geometry_type = GeometryType::Triangle;
 	//}
 	return ray.distance < VERY_FAR;
@@ -144,8 +318,8 @@ __device__ inline bool intersect_scene(RayQueue& ray, Scene::GPUScene sceneData)
 __device__ inline bool intersect_scene_simple(ShadowQueue& ray, Scene::GPUScene sceneData, const float& closestAllowed) {
 	float d;
 
-	if (sceneData.CUDACachedBVH.intersectSimple(ray, closestAllowed))
-		return true;
+	/*if (sceneData.CUDACachedBVH.intersectSimple(ray, closestAllowed))
+		return true;*/
 
 	for (int i = NUM_SPHERES; i--;) {
 		if ((d = spheres[i].intersect_simple(ray)) && (d + epsilon) < closestAllowed) {
@@ -226,7 +400,7 @@ __global__ void set_wavefront_globals() {
 }
 
 /// Generate primary rays. Fill ray_buffer up till max length.
-__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius) {
+__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius, Scene::GPUScene sceneData, glm::vec4* blit_buffer) {
 
 	//Fill ray buffer up to ray_queue_buffer_size.
 	while (true) {
@@ -274,7 +448,17 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 
 		glm::vec3 direction = glm::normalize(convergencePoint - newOrigin);
 
-		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1, 1, 1 }, 0, 0, 0, y * render_width + x };
+		//ray_buffer[ray_index_buffer] 
+		RayQueue ray = { newOrigin, direction, { 1, 1, 1 }, 0, 0, 0, y * render_width + x };
+
+		ray.distance = VERY_FAR;
+	//intersect_scene(ray, sceneData);
+		if (intersect_voxel(ray, sceneData)) {
+			atomicAdd(&blit_buffer[ray.index].r, 1.f);
+			atomicAdd(&blit_buffer[ray.index].g, 0.f);
+			atomicAdd(&blit_buffer[ray.index].b, 1.f);
+			atomicAdd(&blit_buffer[ray.index].a, 1.f);
+		}
 	}
 }
 
@@ -346,6 +530,8 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 		int reflection_type = DIFF;
 
 		if (ray.distance < VERY_FAR) {
+
+
 			ray.origin += ray.direction * ray.distance;
 
 			glm::vec3 normal;
@@ -354,16 +540,22 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 				normal = (ray.origin - object.position) / object.radius;
 				reflection_type = object.refl;
 
-				if (reflection_type != REFR && reflection_type != LIGHT) {
+				if (reflection_type != LIGHT) {
 					ray.direct *= object.color;
 				}
 				object_color = object.color;
 			} else {
-				const Triangle& triangle = sceneData.CUDACachedBVH.primitives[ray.identifier];
-				normal = glm::normalize(glm::cross(triangle.e1, triangle.e2));
-				reflection_type = DIFF;
-				object_color = glm::vec3(1.f);
+				//normal = glm::normalize(glm::cross(triangle.e1, triangle.e2));
+				//reflection_type = DIFF;
+				object_color = glm::vec3(1.f, 0.f, 1.f);
 			}
+
+			atomicAdd(&blit_buffer[ray.index].r, object_color.x);
+			atomicAdd(&blit_buffer[ray.index].g, object_color.y);
+			atomicAdd(&blit_buffer[ray.index].b, object_color.z);
+			atomicAdd(&blit_buffer[ray.index].a, 1);
+
+			return;
 
 			bool outside = dot(normal, ray.direction) < 0;
 			normal = outside ? normal : normal * -1.f; // make n front facing is we are inside an object
@@ -373,209 +565,77 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 
 			//Handle light case before resetting previous ray specular
 			if (reflection_type == LIGHT) {
-				if (ray.lastSpecular == true) {
-					//color = spheres[ray.identifier].emmission;
-					color = ray.direct * spheres[ray.identifier].emmission;
-				} else {
-					color = glm::vec3(0.0f);
-					ray.direct = glm::vec3(0.0, 0.0f, 0.0f);
-				}
+				color = glm::vec3(0.0f);
+				ray.direct = glm::vec3(0.0, 0.0f, 0.0f);
 			}
-			//Initialize lastSpecular to false before each reflection_type.
-			ray.lastSpecular = false;
+
 			switch (reflection_type) {
-			case LIGHT: {
-				break;
-			}
-			case DIFF: {
-				// Generate new shadow ray
-				glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
-				float sunLight = dot(normal, sunSampleDir);
-
-				// < 0.f means sun is behind the surface
-				if (RandomFloat(seed) < 0.5f) { // NEE sample the sun
-					if (sunLight > 0.f) {
-						unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-						shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * (sun(sunSampleDir) * sunLight * 1E-5f), ray.index };
-					}
-				} else { // NEE Sample the light source in the scene
-					//TODO(Dan): Hardcoded spheres[6] as only light source. Use light array.
-					Sphere& lightsource = spheres[6];
-
-					float cosPhi = 2.0f * RandomFloat(seed) - 1.0f;
-					float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-					float theta = 2.0f * pi * RandomFloat(seed);
-
-					float x = lightsource.position.x + lightsource.radius * sinPhi * std::sinf(theta);
-					float y = lightsource.position.y + lightsource.radius * cosPhi;
-					float z = lightsource.position.z + lightsource.radius * sinPhi * std::cosf(theta);
-
-					glm::vec3 lightVector = glm::vec3(x, y, z) - ray.origin;
-					glm::vec3 nL = glm::normalize(glm::vec3(x, y, z) - lightsource.position);
-					glm::vec3 lightDir = glm::normalize(lightVector);
-					float cosSurfaceToLight = glm::dot(normal, lightDir);
-					float cosLightToSurface = glm::dot(nL, -lightDir);
-
-					if (cosSurfaceToLight > 0 && cosLightToSurface > 0) {
-
-						float closestAllowed = glm::length(lightVector);
-						float area = 4 * pi * lightsource.radius * lightsource.radius;
-						float solidAngle = (cosLightToSurface * area) / glm::dot(lightVector, lightVector);
-						glm::vec3 shadowColor = lightsource.emmission * 2.0f * ray.direct * solidAngle * inv_pi * cosSurfaceToLight;
-
-						unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-
-						shadowQueue[shadow_index] = { ray.origin, lightDir, shadowColor, ray.index, closestAllowed };
-					}
+				case LIGHT: {
+					break;
 				}
+				case DIFF: {
+					// Generate new shadow ray
+					glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
+					float sunLight = dot(normal, sunSampleDir);
 
-				if (ray.bounces < MAX_BOUNCES) {
-#if 0 // Stratified sampling.
-					glm::vec2 samples = Random2DStratifiedSample(seed); 
-					float r1 = 2.f * pi * samples.x;
-					float r2 = samples.y;
-#else
-					float r1 = 2.f * pi * RandomFloat(seed);
-					float r2 = RandomFloat(seed);
-#endif
-					float r2s = sqrt(r2);
-
-					// Transform to hemisphere coordinate system
-					glm::vec3 u, v;
-					computeOrthonormalBasisNaive(normal, &u, &v);
-					// Get sample on hemisphere
-					const glm::vec3 d = glm::normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + normal * sqrt(1 - r2));
-					ray.direction = d;
-				}
-
-				break;
-			}
-			case SPEC: {
-				ray.lastSpecular = true;
-				ray.direction = reflect(ray.direction, normal);
-				break;
-			}
-			case REFR: {
-				//Based on : https://graphics.stanford.edu/courses/cs148-10-summer/docs/2006--degreve--reflection_refraction.pdf
-				//Modified Schlick2 in paper to be normal Schlick, i.e
-				//Does not handle case where n2 < n1 ( If you're in water looking at outside)
-				//Compute IoR's  and swap if outside/inside.
-				//TODO(Dan): I'm sure we defy convention by doing n2/n1 though. Check other sources?
-				const float n1 = outside ? 1.2f : 1.0f;
-				const float n2 = outside ? 1.0f : 1.2f;
-				//Compute fresnel via Schlick's approximation
-				float fresnel = 0;
-				float r0 = (n1 - n2) / (n1 + n2);
-				r0 *= r0;
-				const float cosI = -glm::dot(normal, ray.direction);
-				const float n = n2 / n1;
-				const float sinT2 = n * n * (1.0f - cosI * cosI);
-				//Check for Total Internal Reflection
-				if (sinT2 > 1.0f) {
-					fresnel = 1.0f;
-				} else {
-					const float x = 1.0f - cosI;
-					fresnel = r0 + (1.0f - r0) * x * x * x * x * x;
-				}
-
-				if (RandomFloat(seed) < fresnel) {
-					ray.lastSpecular = true;
-					ray.direction = reflect(ray.direction, normal);
-				} else {
-					//Offset origin by twice the normal * epsilon amount, because we already offset it towards the normal once.
-					//Do this because we now want the origin to be below the normal.
-					ray.origin = ray.origin - normal * 2.f * epsilon;
-
-					const float cosT = sqrt(1.0f - sinT2);
-					ray.direction = n * ray.direction + (n * cosI - cosT) * normal;
-				}
-
-				if (!outside) {
-					ray.direct *= exp(-object_color * ray.distance);
-				}
-				break;
-			}
-			case PHONG: {
-				glm::vec3 w;
-				glm::vec3 u, v;
-				glm::vec3 d;
-				float phongexponent = 40.0f;
-				do {
-					// compute random perturbation of ideal reflection vector
-					// the higher the phong exponent, the closer the perturbed vector
-					// is to the ideal reflection direction
-					float phi = 2 * pi * RandomFloat(seed);
-					float r2 = RandomFloat(seed);
-					float cosTheta = powf(1.0f - r2, 1.0f / (phongexponent + 1.0f));
-					float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
-
-					/* 
-					Create orthonormal basis uvw around reflection vector with 
-					hitpoint as origin w is ray direction for ideal reflection
-				 */
-					w = ray.direction - normal * 2.0f * dot(normal, ray.direction);
-					w = normalize(w);
-
-					// Transform to hemisphere coordinate system
-					computeOrthonormalBasisNaive(w, &u, &v);
-					// Get sample on hemisphere
-					// compute cosine weighted random ray direction on hemisphere
-
-					d = u * cosf(phi) * sinTheta + v * sinf(phi) * sinTheta + w * cosTheta;
-					d = normalize(d);
-				} while (dot(d, normal) <= epsilon);
-
-				glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
-				float sunLight = dot(normal, sunSampleDir);
-
-				//SunLight is cos of sampleDir to normal. For phong we weight it proportional to cos(theta) ^ phongExponent
-				if (RandomFloat(seed) < 0.5f) {
-					if (sunLight > 0.f) {
-						float phongCos = dot(sunSampleDir, w);
-						if (phongCos > epsilon) {
-							sunLight *= powf(phongCos, phongexponent);
+					// < 0.f means sun is behind the surface
+					if (RandomFloat(seed) < 0.5f) { // NEE sample the sun
+						if (sunLight > 0.f) {
 							unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-							shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * ((phongexponent + 2) * 0.5f * inv_pi) * (sun(sunSampleDir) * sunLight * 1E-5f), ray.index };
+							shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * (sun(sunSampleDir) * sunLight * 1E-5f), ray.index };
 						}
-					}
-				} else { // NEE Sample the light source in the scene
-					//TODO(Dan): Hardcoded spheres[6] as only light source. Use light array.
-					Sphere& lightsource = spheres[6];
+					} else { // NEE Sample the light source in the scene
+						//TODO(Dan): Hardcoded spheres[6] as only light source. Use light array.
+						Sphere& lightsource = spheres[6];
 
-					float cosPhi = 2.0f * RandomFloat(seed) - 1.0f;
-					float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-					float theta = 2.0f * pi * RandomFloat(seed);
+						float cosPhi = 2.0f * RandomFloat(seed) - 1.0f;
+						float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
+						float theta = 2.0f * pi * RandomFloat(seed);
 
-					float x = lightsource.position.x + lightsource.radius * sinPhi * std::sinf(theta);
-					float y = lightsource.position.y + lightsource.radius * cosPhi;
-					float z = lightsource.position.z + lightsource.radius * sinPhi * std::cosf(theta);
+						float x = lightsource.position.x + lightsource.radius * sinPhi * std::sinf(theta);
+						float y = lightsource.position.y + lightsource.radius * cosPhi;
+						float z = lightsource.position.z + lightsource.radius * sinPhi * std::cosf(theta);
 
-					glm::vec3 lightVector = glm::vec3(x, y, z) - ray.origin;
-					glm::vec3 nL = glm::normalize(glm::vec3(x, y, z) - lightsource.position);
-					glm::vec3 lightDir = glm::normalize(lightVector);
-					float cosSurfaceToLight = glm::dot(normal, lightDir);
-					float cosLightToSurface = glm::dot(nL, -lightDir);
+						glm::vec3 lightVector = glm::vec3(x, y, z) - ray.origin;
+						glm::vec3 nL = glm::normalize(glm::vec3(x, y, z) - lightsource.position);
+						glm::vec3 lightDir = glm::normalize(lightVector);
+						float cosSurfaceToLight = glm::dot(normal, lightDir);
+						float cosLightToSurface = glm::dot(nL, -lightDir);
 
-					if (cosSurfaceToLight > 0 && cosLightToSurface > 0) {
-						float phongCos = dot(lightDir, w);
-						if (phongCos > epsilon) {
-							phongCos = powf(phongCos, phongexponent);
+						if (cosSurfaceToLight > 0 && cosLightToSurface > 0) {
+
 							float closestAllowed = glm::length(lightVector);
-							float area = 4.0f * pi * lightsource.radius * lightsource.radius;
+							float area = 4 * pi * lightsource.radius * lightsource.radius;
 							float solidAngle = (cosLightToSurface * area) / glm::dot(lightVector, lightVector);
-							glm::vec3 shadowColor = lightsource.emmission * 2.0f * ray.direct * solidAngle * (phongexponent + 2) * 0.5f * inv_pi * phongCos * cosSurfaceToLight;
+							glm::vec3 shadowColor = lightsource.emmission * 2.0f * ray.direct * solidAngle * inv_pi * cosSurfaceToLight;
 
 							unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
 
 							shadowQueue[shadow_index] = { ray.origin, lightDir, shadowColor, ray.index, closestAllowed };
 						}
 					}
-				}
-				ray.origin = ray.origin + w * epsilon; // scene size dependent
-				ray.direction = d;
 
-				break;
-			}
+					if (ray.bounces < MAX_BOUNCES) {
+	#if 0 // Stratified sampling.
+						glm::vec2 samples = Random2DStratifiedSample(seed); 
+						float r1 = 2.f * pi * samples.x;
+						float r2 = samples.y;
+	#else
+						float r1 = 2.f * pi * RandomFloat(seed);
+						float r2 = RandomFloat(seed);
+	#endif
+						float r2s = sqrt(r2);
+
+						// Transform to hemisphere coordinate system
+						glm::vec3 u, v;
+						computeOrthonormalBasisNaive(normal, &u, &v);
+						// Get sample on hemisphere
+						const glm::vec3 d = glm::normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + normal * sqrt(1 - r2));
+						ray.direction = d;
+					}
+
+					break;
+				}
 			}
 
 			//Russian roullete
@@ -652,9 +712,9 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 		first_time = false;
 
 		Sphere sphere_data[NUM_SPHERES] = { { 16.5, { 0, 40, 16.5f }, { 1, 1, 1 }, { 0, 0, 0 }, DIFF },
-											{ 16.5, { 40, 0, 16.5f }, { 0.5, 0.5, 0.06 }, { 0, 0, 0 }, REFR },
-											{ 16.5, { -40, -50, 36.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, PHONG },
-											{ 16.5, { -40, -50, 16.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, SPEC },
+											{ 16.5, { 40, 0, 16.5f }, { 0.5, 0.5, 0.06 }, { 0, 0, 0 }, DIFF },
+											{ 16.5, { -40, -50, 36.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, DIFF },
+											{ 16.5, { -40, -50, 16.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, DIFF },
 											{ 1e4f, { 0, 0, -1e4f - 20 }, { 1, 1, 1 }, { 0, 0, 0 }, DIFF },
 											{ 20, { 0, -80, 20 }, { 1.0, 0.0, 0.0 }, { 0, 0, 0 }, DIFF },
 											{ 9, { 0, -80, 120.0f }, { 0.0, 1.0, 0.0 }, { 3, 3, 3 }, LIGHT } };
@@ -696,14 +756,14 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 		int new_value = 0;
 		cuda(MemcpyToSymbol(primary_ray_cnt, &new_value, sizeof(int)));
 	}
-	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius);
+	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
 #if BVH_DEBUG
 	extend_debug_BVH<<<40, 128>>>(ray_buffer, sceneData, blit_buffer);
 #else
-	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData);
-	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	//extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData);
+	//shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+	//connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
 #endif
 
 	dim3 threads = dim3(16, 16, 1);

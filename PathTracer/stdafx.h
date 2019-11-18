@@ -39,7 +39,6 @@
 #include "static_mesh.h"
 
 #include "Bbox.h"
-#include "BVH.h"
 #include "Scene.h"
 
 #include "camera.h"
