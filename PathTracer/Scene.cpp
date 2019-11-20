@@ -9,7 +9,7 @@ void Scene::Load(const char path[]) {
 	for (int x = 0; x < grid_size; x++) {
 		for (int y = 0; y < grid_size; y++) {
 			for (int z = 0; z < grid_size; z++) {
-				scene[x + y * grid_size + z * grid_size * grid_size] = sqrt(32 * 32 - x * x + y * y + z * z) < 128;
+				scene[x + y * grid_size + z * grid_size * grid_size] = sqrt(x * x + y * y + z * z) < 128;
 			}
 		}
 	}

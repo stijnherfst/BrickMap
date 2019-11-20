@@ -25,20 +25,20 @@ struct RayQueue {
 	glm::vec3 origin;
 	glm::vec3 direction;
 	glm::vec3 direct;
+	glm::vec3 normal;
 	float distance;
 	int identifier;
 	int bounces;
-	int index;
-	GeometryType geometry_type = GeometryType::Triangle;
-	bool lastSpecular = true;
+	int pixel_index;
+	//GeometryType geometry_type = GeometryType::Triangle;
+	//bool lastSpecular = true;
 };
 
 struct ShadowQueue {
 	glm::vec3 origin;
 	glm::vec3 direction;
 	glm::vec3 color;
-	int buffer_index;
-	float closestDistance = 1e20f;
+	int pixel_index;
 };
 
 const unsigned int ray_queue_buffer_size = 1'048'576 * 2;

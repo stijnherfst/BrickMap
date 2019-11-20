@@ -122,69 +122,170 @@ struct Sphere {
 
 __constant__ Sphere spheres[NUM_SPHERES];
 
-__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene) {
-	glm::vec3 raydir, curpos;
-	curpos = ray.origin;
-	raydir = ray.direction;
+__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm::vec3& normal, unsigned int seed) {
+	glm::vec3 cb, tmax, tdelta;
+	int stepX, outX, X = (int)ray.origin.x;
+	int stepY, outY, Y = (int)ray.origin.y;
+	int stepZ, outZ, Z = (int)ray.origin.z;
 
-	// setup 3DDDA (double check reusability of primary ray data)
-	glm::vec3 cb, tmax, tdelta, cell;
-	cell = curpos;
-	int stepX, outX, X = (int)cell.x;
-	int stepY, outY, Y = (int)cell.y;
-	int stepZ, outZ, Z = (int)cell.z;
-
-	if ((X < 0) || (X >= grid_size) || (Y < 0) || (Y >= grid_size) || (Z < 0) || (Z >= grid_size))
+	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size)
 		return false;
-	if (raydir.x > 0) {
-		stepX = 1, outX = grid_size;
-		cb.x = (X + 1);
+	if (ray.direction.x > 0) {
+		stepX = 1;
+		outX = grid_size;
+		cb.x = X + 1;
 	} else {
-		stepX = -1, outX = -1;
+		stepX = -1;
+		outX = -1;
 		cb.x = X;
 	}
-	if (raydir.y > 0.0f) {
-		stepY = 1, outY = grid_size;
-		cb.y = (Y + 1);
+	if (ray.direction.y > 0.0f) {
+		stepY = 1;
+		outY = grid_size;
+		cb.y = Y + 1;
 	} else {
 		stepY = -1, outY = -1;
 		cb.y = Y;
 	}
-	if (raydir.z > 0.0f) {
-		stepZ = 1, outZ = grid_size;
-		cb.z = (Z + 1);
+	if (ray.direction.z > 0.0f) {
+		stepZ = 1;
+		outZ = grid_size;
+		cb.z = Z + 1;
 	} else {
-		stepZ = -1, outZ = -1;
+		stepZ = -1;
+		outZ = -1;
 		cb.z = Z;
 	}
 	float rxr, ryr, rzr;
-	if (raydir.x != 0) {
-		rxr = 1.0f / raydir.x;
-		tmax.x = (cb.x - curpos.x) * rxr;
+	if (ray.direction.x != 0) {
+		rxr = 1.0f / ray.direction.x;
+		tmax.x = (cb.x - ray.origin.x) * rxr;
 		tdelta.x = stepX * rxr;
 	} else
 		tmax.x = 1000000;
-	if (raydir.y != 0) {
-		ryr = 1.0f / raydir.y;
-		tmax.y = (cb.y - curpos.y) * ryr;
+	if (ray.direction.y != 0) {
+		ryr = 1.0f / ray.direction.y;
+		tmax.y = (cb.y - ray.origin.y) * ryr;
 		tdelta.y = stepY * ryr;
 	} else
 		tmax.y = 1000000;
-	if (raydir.z != 0) {
-		rzr = 1.0f / raydir.z;
-		tmax.z = (cb.z - curpos.z) * rzr;
+	if (ray.direction.z != 0) {
+		rzr = 1.0f / ray.direction.z;
+		tmax.z = (cb.z - ray.origin.z) * rzr;
+		tdelta.z = stepZ * rzr;
+	} else
+		tmax.z = 1000000;
+	// start stepping
+	int stepcount = 0;
+	float distance = 0.f;
+	// trace primary ray
+	while (1) {
+		if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+			ray.identifier = 0;
+			ray.distance = distance;
+
+			//unsigned int seedd = (seed * 147565741) * 720898027 * X * Y;
+			//if (RandomFloat(seedd) < 0.00001f) {
+			//	printf("%f\n", ray.distance);
+			//}
+			return true;
+		}
+		stepcount++;
+		if (tmax.x < tmax.y) {
+			if (tmax.x < tmax.z) {
+				X += stepX;
+				if (X == outX)
+					return false;
+				distance = tmax.x;
+				tmax.x += tdelta.x;
+				normal = glm::vec3(-stepX, 0, 0);
+			} else {
+				Z += stepZ;
+				if (Z == outZ)
+					return false;
+				distance = tmax.z;
+				tmax.z += tdelta.z;
+				normal = glm::vec3(0, 0, -stepZ);
+			}
+		} else {
+			if (tmax.y < tmax.z) {
+				Y += stepY;
+				if (Y == outY)
+					return false;
+				distance = tmax.y;
+				tmax.y += tdelta.y;
+				normal = glm::vec3(0, -stepY, 0);
+			} else {
+				Z += stepZ;
+				if (Z == outZ)
+					return false;
+				distance = tmax.z;
+				tmax.z += tdelta.z;
+				normal = glm::vec3(0, 0, -stepZ);
+			}
+		}
+	}
+	return false;
+}
+
+__device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene scene) {
+	glm::vec3 cb, tmax, tdelta;
+	int stepX, outX, X = (int)ray.origin.x;
+	int stepY, outY, Y = (int)ray.origin.y;
+	int stepZ, outZ, Z = (int)ray.origin.z;
+
+	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size)
+		return false;
+	if (ray.direction.x > 0) {
+		stepX = 1;
+		outX = grid_size;
+		cb.x = X + 1;
+	} else {
+		stepX = -1;
+		outX = -1;
+		cb.x = X;
+	}
+	if (ray.direction.y > 0.0f) {
+		stepY = 1;
+		outY = grid_size;
+		cb.y = Y + 1;
+	} else {
+		stepY = -1, outY = -1;
+		cb.y = Y;
+	}
+	if (ray.direction.z > 0.0f) {
+		stepZ = 1;
+		outZ = grid_size;
+		cb.z = Z + 1;
+	} else {
+		stepZ = -1;
+		outZ = -1;
+		cb.z = Z;
+	}
+	float rxr, ryr, rzr;
+	if (ray.direction.x != 0) {
+		rxr = 1.0f / ray.direction.x;
+		tmax.x = (cb.x - ray.origin.x) * rxr;
+		tdelta.x = stepX * rxr;
+	} else
+		tmax.x = 1000000;
+	if (ray.direction.y != 0) {
+		ryr = 1.0f / ray.direction.y;
+		tmax.y = (cb.y - ray.origin.y) * ryr;
+		tdelta.y = stepY * ryr;
+	} else
+		tmax.y = 1000000;
+	if (ray.direction.z != 0) {
+		rzr = 1.0f / ray.direction.z;
+		tmax.z = (cb.z - ray.origin.z) * rzr;
 		tdelta.z = stepZ * rzr;
 	} else
 		tmax.z = 1000000;
 	// start stepping
 
-	//return true;
 	// trace primary ray
 	while (1) {
-		//if (X > 16 && Y > 16 && X < 32 && Y < 32)
-		//	return true;
 		if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
-			//printf("a");
 			return true;
 		}
 		if (tmax.x < tmax.y) {
@@ -213,88 +314,36 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene) {
 			}
 		}
 	}
-
-//testloop:
-//	while (1) {
-//		/*list = grid[X + (Y << GRIDSHFT) + (Z << (GRIDSHFT * 2))];
-//		while (list) {
-//			Primitive* pr = list->GetPrimitive();
-//			int result;
-//			if (pr->GetLastRayID() != a_Ray.GetID())
-//				if (result = pr->Intersect(a_Ray, a_Dist)) {
-//					a_Prim = pr;
-//					retval = result;
-//				}
-//			list = list->GetNext();
-//		}*/
-//		if (scene.voxels[X + Y * 264 + Z * 264 * 264]) {
-//			return true;
-//		}
-//
-//		if (tmax.x < tmax.y) {
-//			if (tmax.x < tmax.z) {
-//				if (a_Dist < tmax.x)
-//					break;
-//				X = X + stepX;
-//				if (X == outX)
-//					break;
-//				tmax.x += tdelta.x;
-//			} else {
-//				if (a_Dist < tmax.z)
-//					break;
-//				Z = Z + stepZ;
-//				if (Z == outZ)
-//					break;
-//				tmax.z += tdelta.z;
-//			}
-//		} else {
-//			if (tmax.y < tmax.z) {
-//				if (a_Dist < tmax.y)
-//					break;
-//				Y = Y + stepY;
-//				if (Y == outY)
-//					break;
-//				tmax.y += tdelta.y;
-//			} else {
-//				if (a_Dist < tmax.z)
-//					break;
-//				Z = Z + stepZ;
-//				if (Z == outZ)
-//					break;
-//				tmax.z += tdelta.z;
-//			}
-//		}
-//	}
 	return false;
 }
 
-__device__ inline bool intersect_scene(RayQueue& ray, Scene::GPUScene sceneData) {
-	float d;
-	ray.distance = VERY_FAR;
-
-	for (int i = NUM_SPHERES; i--;) {
-		//d = spheres[i].intersect(ray);
-		if ((d = spheres[i].intersect(ray)) && d < ray.distance) {
-			ray.distance = d;
-			ray.identifier = i;
-			ray.geometry_type = GeometryType::Sphere;
-		}
-	}
-
-
-	if (intersect_voxel(ray, sceneData)) {
-		ray.identifier = 0;
-		ray.geometry_type == GeometryType::Triangle;
-		ray.distance = 1;
-		return true;
-	}
-
-
-	//if (sceneData.CUDACachedBVH.intersect(ray)) {
-	//	ray.geometry_type = GeometryType::Triangle;
-	//}
-	return ray.distance < VERY_FAR;
-}
+//__device__ inline bool intersect_scene(RayQueue& ray, Scene::GPUScene sceneData) {
+//	float d;
+//	ray.distance = VERY_FAR;
+//
+//	for (int i = NUM_SPHERES; i--;) {
+//		//d = spheres[i].intersect(ray);
+//		if ((d = spheres[i].intersect(ray)) && d < ray.distance) {
+//			ray.distance = d;
+//			ray.identifier = i;
+//			//ray.geometry_type = GeometryType::Sphere;
+//		}
+//	}
+//
+//	glm::vec3 normal;
+//	if (intersect_voxel(ray, sceneData, normal)) {
+//		ray.identifier = 0;
+//		//ray.geometry_type == GeometryType::Triangle;
+//		ray.distance = 1;
+//		return true;
+//	}
+//
+//
+//	//if (sceneData.CUDACachedBVH.intersect(ray)) {
+//	//	ray.geometry_type = GeometryType::Triangle;
+//	//}
+//	return ray.distance < VERY_FAR;
+//}
 
 __device__ inline bool intersect_scene_DEBUG(RayQueue& ray, Scene::GPUScene sceneData, int* traversals) {
 	float d;
@@ -305,7 +354,7 @@ __device__ inline bool intersect_scene_DEBUG(RayQueue& ray, Scene::GPUScene scen
 		if ((d = spheres[i].intersect(ray)) && d < ray.distance) {
 			ray.distance = d;
 			ray.identifier = i;
-			ray.geometry_type = GeometryType::Sphere;
+			//ray.geometry_type = GeometryType::Sphere;
 		}
 	}
 
@@ -315,19 +364,19 @@ __device__ inline bool intersect_scene_DEBUG(RayQueue& ray, Scene::GPUScene scen
 	return ray.distance < VERY_FAR;
 }
 
-__device__ inline bool intersect_scene_simple(ShadowQueue& ray, Scene::GPUScene sceneData, const float& closestAllowed) {
-	float d;
-
-	/*if (sceneData.CUDACachedBVH.intersectSimple(ray, closestAllowed))
-		return true;*/
-
-	for (int i = NUM_SPHERES; i--;) {
-		if ((d = spheres[i].intersect_simple(ray)) && (d + epsilon) < closestAllowed) {
-			return true;
-		}
-	}
-	return false;
-}
+//__device__ inline bool intersect_scene_simple(ShadowQueue& ray, Scene::GPUScene sceneData, const float& closestAllowed) {
+//	float d;
+//
+//	/*if (sceneData.CUDACachedBVH.intersectSimple(ray, closestAllowed))
+//		return true;*/
+//
+//	for (int i = NUM_SPHERES; i--;) {
+//		if ((d = spheres[i].intersect_simple(ray)) && (d + epsilon) < closestAllowed) {
+//			return true;
+//		}
+//	}
+//	return false;
+//}
 
 /*
 	Given a direction unit vector W, computes two other vectors U and V which 
@@ -448,17 +497,7 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 
 		glm::vec3 direction = glm::normalize(convergencePoint - newOrigin);
 
-		//ray_buffer[ray_index_buffer] 
-		RayQueue ray = { newOrigin, direction, { 1, 1, 1 }, 0, 0, 0, y * render_width + x };
-
-		ray.distance = VERY_FAR;
-	//intersect_scene(ray, sceneData);
-		if (intersect_voxel(ray, sceneData)) {
-			atomicAdd(&blit_buffer[ray.index].r, 1.f);
-			atomicAdd(&blit_buffer[ray.index].g, 0.f);
-			atomicAdd(&blit_buffer[ray.index].b, 1.f);
-			atomicAdd(&blit_buffer[ray.index].a, 1.f);
-		}
+		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1, 1, 1 }, { 0, 0, 0 }, 0, 0, 0, y * render_width + x };
 	}
 }
 
@@ -482,19 +521,19 @@ __global__ void __launch_bounds__(128, 8) extend_debug_BVH(RayQueue* ray_buffer,
 		glm::vec3 color = {};
 		int green = (0.0002f * traversals) * 255.99f;
 		green = green > 255 ? 255 : green;
-		blit_buffer[ray.index].g = green;
-		blit_buffer[ray.index].a = 1;
+		blit_buffer[ray.pixel_index].g = green;
+		blit_buffer[ray.pixel_index].a = 1;
 
 		if (traversals >= 70) { //Color very costly regions distinctly
 			int red = green;
-			blit_buffer[ray.index].r = red;
-			blit_buffer[ray.index].g = 0;
+			blit_buffer[ray.pixel_index].r = red;
+			blit_buffer[ray.pixel_index].g = 0;
 		}
 	}
 }
 
 /// Advance the ray segments once
-__global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GPUScene sceneData) {
+__global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_extend, 1);
 
@@ -504,7 +543,8 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 		RayQueue& ray = ray_buffer[index];
 
 		ray.distance = VERY_FAR;
-		intersect_scene(ray, sceneData);
+		//intersect_scene(ray, sceneData);
+		intersect_voxel(ray, sceneData, ray.normal, seed);
 	}
 }
 
@@ -526,39 +566,31 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 		//Color can be non-zero if sun/sky or we're counting emisivity for different objects.
 		glm::vec3 color = glm::vec3(0.f);
 		glm::vec3 object_color;
-		unsigned int seed = (frame * ray.index * 147565741) * 720898027 * index;
+		unsigned int seed = (frame * ray.pixel_index * 147565741) * 720898027 * index;
 		int reflection_type = DIFF;
 
 		if (ray.distance < VERY_FAR) {
-
-
 			ray.origin += ray.direction * ray.distance;
 
-			glm::vec3 normal;
-			if (ray.geometry_type == GeometryType::Sphere) {
-				const Sphere& object = spheres[ray.identifier];
-				normal = (ray.origin - object.position) / object.radius;
-				reflection_type = object.refl;
+			glm::vec3 normal = ray.normal;
+			object_color = glm::vec3(1.f, 0.f, 1.f);
+			//if (ray.identifier != 0) {
+			//	const Sphere& object = spheres[ray.identifier];
+			//	normal = (ray.origin - object.position) / object.radius;
+			//	reflection_type = object.refl;
 
-				if (reflection_type != LIGHT) {
-					ray.direct *= object.color;
-				}
-				object_color = object.color;
-			} else {
-				//normal = glm::normalize(glm::cross(triangle.e1, triangle.e2));
-				//reflection_type = DIFF;
-				object_color = glm::vec3(1.f, 0.f, 1.f);
-			}
+			//	if (reflection_type != LIGHT) {
+			//		ray.direct *= object.color;
+			//	}
+			//	object_color = object.color;
+			//} else {
+			//	//normal = glm::normalize(glm::cross(triangle.e1, triangle.e2));
+			//	//reflection_type = DIFF;
+			//	object_color = glm::vec3(1.f, 0.f, 1.f);
+			//}
 
-			atomicAdd(&blit_buffer[ray.index].r, object_color.x);
-			atomicAdd(&blit_buffer[ray.index].g, object_color.y);
-			atomicAdd(&blit_buffer[ray.index].b, object_color.z);
-			atomicAdd(&blit_buffer[ray.index].a, 1);
-
-			return;
-
-			bool outside = dot(normal, ray.direction) < 0;
-			normal = outside ? normal : normal * -1.f; // make n front facing is we are inside an object
+			//bool outside = dot(normal, ray.direction) < 0;
+			//normal = outside ? normal : normal * -1.f; // make n front facing is we are inside an object
 
 			//Prevent self-intersection
 			ray.origin += normal * epsilon;
@@ -579,47 +611,47 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 					float sunLight = dot(normal, sunSampleDir);
 
 					// < 0.f means sun is behind the surface
-					if (RandomFloat(seed) < 0.5f) { // NEE sample the sun
-						if (sunLight > 0.f) {
-							unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-							shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * (sun(sunSampleDir) * sunLight * 1E-5f), ray.index };
-						}
-					} else { // NEE Sample the light source in the scene
-						//TODO(Dan): Hardcoded spheres[6] as only light source. Use light array.
-						Sphere& lightsource = spheres[6];
-
-						float cosPhi = 2.0f * RandomFloat(seed) - 1.0f;
-						float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
-						float theta = 2.0f * pi * RandomFloat(seed);
-
-						float x = lightsource.position.x + lightsource.radius * sinPhi * std::sinf(theta);
-						float y = lightsource.position.y + lightsource.radius * cosPhi;
-						float z = lightsource.position.z + lightsource.radius * sinPhi * std::cosf(theta);
-
-						glm::vec3 lightVector = glm::vec3(x, y, z) - ray.origin;
-						glm::vec3 nL = glm::normalize(glm::vec3(x, y, z) - lightsource.position);
-						glm::vec3 lightDir = glm::normalize(lightVector);
-						float cosSurfaceToLight = glm::dot(normal, lightDir);
-						float cosLightToSurface = glm::dot(nL, -lightDir);
-
-						if (cosSurfaceToLight > 0 && cosLightToSurface > 0) {
-
-							float closestAllowed = glm::length(lightVector);
-							float area = 4 * pi * lightsource.radius * lightsource.radius;
-							float solidAngle = (cosLightToSurface * area) / glm::dot(lightVector, lightVector);
-							glm::vec3 shadowColor = lightsource.emmission * 2.0f * ray.direct * solidAngle * inv_pi * cosSurfaceToLight;
-
-							unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-
-							shadowQueue[shadow_index] = { ray.origin, lightDir, shadowColor, ray.index, closestAllowed };
-						}
+					//if (RandomFloat(seed) < 0.5f) { // NEE sample the sun
+					if (sunLight > 0.f) {
+						unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
+						shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * (sun(sunSampleDir) * sunLight * 1E-5f), ray.pixel_index };
 					}
+					//} else { // NEE Sample the light source in the scene
+					//	//TODO(Dan): Hardcoded spheres[6] as only light source. Use light array.
+					//	Sphere& lightsource = spheres[6];
+
+					//	float cosPhi = 2.0f * RandomFloat(seed) - 1.0f;
+					//	float sinPhi = std::sqrt(1.0f - cosPhi * cosPhi);
+					//	float theta = 2.0f * pi * RandomFloat(seed);
+
+					//	float x = lightsource.position.x + lightsource.radius * sinPhi * std::sinf(theta);
+					//	float y = lightsource.position.y + lightsource.radius * cosPhi;
+					//	float z = lightsource.position.z + lightsource.radius * sinPhi * std::cosf(theta);
+
+					//	glm::vec3 lightVector = glm::vec3(x, y, z) - ray.origin;
+					//	glm::vec3 nL = glm::normalize(glm::vec3(x, y, z) - lightsource.position);
+					//	glm::vec3 lightDir = glm::normalize(lightVector);
+					//	float cosSurfaceToLight = glm::dot(normal, lightDir);
+					//	float cosLightToSurface = glm::dot(nL, -lightDir);
+
+					//	if (cosSurfaceToLight > 0 && cosLightToSurface > 0) {
+
+					//		float closestAllowed = glm::length(lightVector);
+					//		float area = 4 * pi * lightsource.radius * lightsource.radius;
+					//		float solidAngle = (cosLightToSurface * area) / glm::dot(lightVector, lightVector);
+					//		glm::vec3 shadowColor = lightsource.emmission * 2.0f * ray.direct * solidAngle * inv_pi * cosSurfaceToLight;
+
+					//		unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
+
+					//		shadowQueue[shadow_index] = { ray.origin, lightDir, shadowColor, ray.index, closestAllowed };
+					//	}
+					//}
 
 					if (ray.bounces < MAX_BOUNCES) {
 	#if 0 // Stratified sampling.
-						glm::vec2 samples = Random2DStratifiedSample(seed); 
-						float r1 = 2.f * pi * samples.x;
-						float r2 = samples.y;
+							glm::vec2 samples = Random2DStratifiedSample(seed); 
+							float r1 = 2.f * pi * samples.x;
+							float r2 = samples.y;
 	#else
 						float r1 = 2.f * pi * RandomFloat(seed);
 						float r2 = RandomFloat(seed);
@@ -653,18 +685,18 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 			}
 
 		} else { //NOTHING HIT
-			// Don't generate new extended ray. Directly add emisivity of sun/sky.
-			color += (ray.lastSpecular == false) ? ray.direct * sky(ray.direction) : ray.direct * sunsky(ray.direction);
+			// Don't generate new extended ray. Directly add emmisivity of sun/sky.
+			color += ray.direct * sunsky(ray.direction);
 			new_frame++;
 		}
 
 		//Color is added every frame to buffer. However color can only be non-zero for sun/sky and if emmisive surface
 		//was hit.
 		//TODO(Dan): Perf increase if only add when != 0? How to interact with sky = black?
-		atomicAdd(&blit_buffer[ray.index].r, color.r);
-		atomicAdd(&blit_buffer[ray.index].g, color.g);
-		atomicAdd(&blit_buffer[ray.index].b, color.b);
-		atomicAdd(&blit_buffer[ray.index].a, new_frame);
+		atomicAdd(&blit_buffer[ray.pixel_index].r, color.r);
+		atomicAdd(&blit_buffer[ray.pixel_index].g, color.g);
+		atomicAdd(&blit_buffer[ray.pixel_index].b, color.b);
+		atomicAdd(&blit_buffer[ray.pixel_index].a, new_frame);
 	}
 }
 
@@ -679,10 +711,10 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 
 		ShadowQueue& ray = queue[index];
 
-		if (!intersect_scene_simple(ray, sceneData, ray.closestDistance)) {
-			atomicAdd(&blit_buffer[ray.buffer_index].r, ray.color.r);
-			atomicAdd(&blit_buffer[ray.buffer_index].g, ray.color.g);
-			atomicAdd(&blit_buffer[ray.buffer_index].b, ray.color.b);
+		if (!intersect_voxel_simple(ray, sceneData)) {
+			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.color.r);
+			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.color.g);
+			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.color.b);
 		}
 	}
 }
@@ -761,9 +793,9 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 #if BVH_DEBUG
 	extend_debug_BVH<<<40, 128>>>(ray_buffer, sceneData, blit_buffer);
 #else
-	//extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData);
-	//shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	//connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);
+	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
 #endif
 
 	dim3 threads = dim3(16, 16, 1);
