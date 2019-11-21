@@ -29,8 +29,6 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
-#include "Rays.h"
-
 #include "variables.h"
 #include "assert_cuda.h"
 #include "cuda_gl_interop.h"

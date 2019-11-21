@@ -38,7 +38,7 @@ void Camera::handle_input(GLFWwindow* window, double delta) {
 
 	horizontal_angle += diffx * 0.012;
 	vertical_angle -= diffy * 0.012;
-	vertical_angle = std::max(-pi / 2 + 0.001, std::min(vertical_angle, pi / 2 - 0.001));
+	vertical_angle = std::max(-pi / 2.0 + 0.001, std::min(vertical_angle, pi / 2.0 - 0.001));
 
 	glfwSetCursorPos(window, w * 0.5, h * 0.5);
 }

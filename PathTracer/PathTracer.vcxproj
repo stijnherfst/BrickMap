@@ -121,7 +121,7 @@
     <ClCompile Include="loader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="performance_measure.cpp" />
-    <ClCompile Include="Scene.cpp">
+    <ClCompile Include="scene.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="static_mesh.cpp" />
@@ -146,8 +146,7 @@
     <ClInclude Include="interop.h" />
     <ClInclude Include="loader.h" />
     <ClInclude Include="performance_measure.h" />
-    <ClInclude Include="Rays.h" />
-    <ClInclude Include="Scene.h" />
+    <ClInclude Include="scene.h" />
     <ClInclude Include="static_mesh.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="sunsky.cuh" />

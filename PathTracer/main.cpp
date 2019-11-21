@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
 	glfwSetKeyCallback(window, glfw_key_callback);
 
 	Scene scene;
-	scene.Load("Data/castle.ply");
+	scene.generate();
 
 #ifdef PERFORMANCE_TEST
 	std::ofstream test_file("performance.txt");
@@ -190,7 +190,7 @@ int main(int argc, char* argv[]) {
 			ImGui::Text("Hor: %f, Vert: %f", camera.horizontal_angle, camera.vertical_angle);
 			ImGui::Text("Sun X: %f Y: %f", sun_position.x, sun_position.y);
 			ImGui::SliderFloat("FocalDistance", &camera.focalDistance, 0.1, 100);
-			ImGui::SliderFloat("LensRadius", &camera.lensRadius, 0.01, 80, "%.3f", 1.3);
+			ImGui::SliderFloat("LensRadius", &camera.lensRadius, 0.01f, 80, "%.3f", 1.3f);
 			//TODO(Dan): Backspace doesn't trigger. Manually need to call ImGui backend?
 			ImGui::InputFloat("Lens Rad", &camera.lensRadius);
 
