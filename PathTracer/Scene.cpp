@@ -9,9 +9,12 @@ void Scene::generate() {
 		for (int y = 0; y < grid_size; y++) {
 			for (int z = 0; z < grid_size; z++) {
 				scene[x + y * grid_size + z * grid_size * grid_size] = sqrt((x - 128) * (x - 128) + (y - 128) * (y - 128) + (z - 128) * (z - 128)) < 128;
+				//scene[x + y * grid_size + z * grid_size * grid_size] = 0;
 			}
 		}
 	}
+
+	scene[0] = 1;
 
 	cuda(Malloc(&gpuScene.voxels, grid_size * grid_size * grid_size));
 	cuda(Memcpy(&gpuScene.voxels[0], &scene[0], grid_size * grid_size * grid_size, cudaMemcpyKind::cudaMemcpyHostToDevice));

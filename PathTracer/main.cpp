@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-//#define PERFORMANCE_TEST
+#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
 	std::cout << description << "\n";
@@ -112,9 +112,9 @@ int main(int argc, char* argv[]) {
 	Scene scene;
 	scene.generate();
 
-#ifdef PERFORMANCE_TEST
-	std::ofstream test_file("performance.txt");
-#endif
+//#ifdef PERFORMANCE_TEST
+//	std::ofstream test_file("performance.txt");
+//#endif
 
 	// Allocate ray queue buffer
 	RayQueue* ray_buffer_work;

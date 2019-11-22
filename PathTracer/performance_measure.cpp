@@ -1,7 +1,11 @@
 #include "stdafx.h"
 
+#include <filesystem>
+namespace fs = std::filesystem;
+
 PerformanceMeasure::PerformanceMeasure() {
-	file.open("Performance.txt");
+	file.open("performance.txt", std::ios::app);
+	file << "\n\n";
 }
 
 bool PerformanceMeasure::measure(double delta) {
