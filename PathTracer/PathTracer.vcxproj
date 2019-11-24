@@ -118,13 +118,11 @@
     <ClCompile Include="imgui_impl_glfw.cpp" />
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="interop.cpp" />
-    <ClCompile Include="loader.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="performance_measure.cpp" />
     <ClCompile Include="scene.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="static_mesh.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -144,10 +142,8 @@
     <ClInclude Include="imgui_impl_glfw.h" />
     <ClInclude Include="imgui_impl_opengl3.h" />
     <ClInclude Include="interop.h" />
-    <ClInclude Include="loader.h" />
     <ClInclude Include="performance_measure.h" />
     <ClInclude Include="scene.h" />
-    <ClInclude Include="static_mesh.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="sunsky.cuh" />
     <ClInclude Include="variables.h" />

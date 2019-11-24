@@ -38,13 +38,7 @@
     <ClInclude Include="variables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="static_mesh.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="camera.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sunsky.cuh">
@@ -103,13 +97,7 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="static_mesh.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="camera.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="loader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="variables.cpp">

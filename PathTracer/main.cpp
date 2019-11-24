@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#define PERFORMANCE_TEST
+//#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
 	std::cout << description << "\n";
@@ -189,7 +189,7 @@ int main(int argc, char* argv[]) {
 			ImGui::Text("X: %f, Y: %f, Z: %f", camera.position.x, camera.position.y, camera.position.z);
 			ImGui::Text("Hor: %f, Vert: %f", camera.horizontal_angle, camera.vertical_angle);
 			ImGui::Text("Sun X: %f Y: %f", sun_position.x, sun_position.y);
-			ImGui::SliderFloat("FocalDistance", &camera.focalDistance, 0.1, 100);
+			ImGui::SliderFloat("FocalDistance", &camera.focalDistance, 0.1f, 100.f);
 			ImGui::SliderFloat("LensRadius", &camera.lensRadius, 0.01f, 80, "%.3f", 1.3f);
 			//TODO(Dan): Backspace doesn't trigger. Manually need to call ImGui backend?
 			ImGui::InputFloat("Lens Rad", &camera.lensRadius);

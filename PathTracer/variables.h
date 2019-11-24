@@ -10,6 +10,8 @@ constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
 constexpr static int grid_size = 256;
+constexpr static int cell_size = 8;
+constexpr static int cells = grid_size / cell_size;
 
 constexpr static float epsilon = 0.001f;
 
@@ -29,7 +31,7 @@ struct RayQueue {
 	float distance;
 	int identifier;
 	int bounces;
-	int pixel_index;
+	unsigned int pixel_index;
 	//GeometryType geometry_type = GeometryType::Triangle;
 	//bool lastSpecular = true;
 };

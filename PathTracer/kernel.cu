@@ -567,8 +567,8 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 		//Compute (x,y) coords based on position in buffer.
 		// X goes (left -> right); Y goes (top -> bottom)
 
-		const int x = (start_position + index) % render_width;
-		const int y = ((start_position + index) / render_width) % render_height;
+		const unsigned int x = (start_position + index) % render_width;
+		const unsigned int y = ((start_position + index) / render_width) % render_height;
 
 		//Get random stratified points inside pixel;
 		glm::vec2 sample2D = Random2DStratifiedSample(seed);
@@ -654,11 +654,7 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 			object_color = glm::vec3(1.f, 0.f, 1.f);
 
 			//Prevent self-intersection
-			//printf("bef x:%f y:%f z:%f\n", ray.origin.x, ray.origin.y, ray.origin.z);
-			glm::vec3 before = ray.origin;
 			ray.origin += normal * epsilon;
-			//printf("bef x:%f y:%f z:%f\naft x:%f y:%f z:%f\n", before.x, before.y, before.z, ray.origin.x, ray.origin.y, ray.origin.z);
-			//printf("aft x:%f y:%f z:%f\n", ray.origin.x, ray.origin.y, ray.origin.z);
 
 			// Generate new shadow ray
 			glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
