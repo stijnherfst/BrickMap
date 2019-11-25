@@ -208,25 +208,22 @@ struct Sphere {
 
 __constant__ Sphere spheres[NUM_SPHERES];
 
-__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm::vec3& normal) {
+__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm::vec3& normal, glm::uvec3 grid_dimensions) {
 	// Check if ray hits grid AABB
 	float tminn;
-	if (!intersect_aabb_branchless2(ray, tminn)) {
-	//if (!intersect_aabb_correct(ray, tminn)) {
+	//if (!intersect_aabb_branchless2(ray, tminn)) {
+	if (!intersect_aabb_correct(ray, tminn)) {
 		return false;
 	}
 
 	// Move ray to hitpoint
 	glm::vec3 origin = ray.origin;
-	glm::vec3 grid_center(grid_size / 2.f);
+	glm::vec3 grid_center(glm::vec3(grid_dimensions) / 2.f);
 	if (tminn > 0) {
-		//if (ray.bounces >= 1) {
-		//}
 		// Maybe this needs to be a normal instead of pointing to the center as it may cause fringing at the edges of a voxel
 		origin += ray.direction * tminn;
 		origin += glm::normalize(grid_center - origin) * epsilon;
-//		printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
-
+		origin /= 8.f;
 	}
 
 	// Initialize 
@@ -235,12 +232,12 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	int stepY, outY, Y = (int)origin.y;
 	int stepZ, outZ, Z = (int)origin.z;
 
-	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size) {
+	if (X < 0 || X >= grid_dimensions.x || Y < 0 || Y >= grid_dimensions.y || Z < 0 || Z >= grid_dimensions.z) {
 		return false;
 	}
 	if (ray.direction.x > 0) {
 		stepX = 1;
-		outX = grid_size;
+		outX = grid_dimensions.x;
 		cb.x = X + 1;
 	} else {
 		stepX = -1;
@@ -249,7 +246,7 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	}
 	if (ray.direction.y > 0.0f) {
 		stepY = 1;
-		outY = grid_size;
+		outY = grid_dimensions.y;
 		cb.y = Y + 1;
 	} else {
 		stepY = -1, outY = -1;
@@ -257,7 +254,7 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	}
 	if (ray.direction.z > 0.0f) {
 		stepZ = 1;
-		outZ = grid_size;
+		outZ = grid_dimensions.z;
 		cb.z = Z + 1;
 	} else {
 		stepZ = -1;
@@ -306,9 +303,13 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	//normal = -result;
 	// Stepping through grid
 	while (1) {
-		if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
-			//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
-			ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
+		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+		//	//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
+		//	ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
+		//	return true;
+		//}
+
+		if (scene.grid[X + Y * grid_dimensions.y + Z * grid_dimensions.z * grid_dimensions.z] != nullptr) {
 			return true;
 		}
 
@@ -349,17 +350,17 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	return false;
 }
 
-__device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene scene) {
+__device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene scene, glm::uvec3 grid_dimensions) {
 	glm::vec3 cb, tmax, tdelta;
 	int stepX, outX, X = (int)ray.origin.x;
 	int stepY, outY, Y = (int)ray.origin.y;
 	int stepZ, outZ, Z = (int)ray.origin.z;
 
-	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size)
+	if (X < 0 || X >= grid_dimensions.x || Y < 0 || Y >= grid_dimensions.y || Z < 0 || Z >= grid_dimensions.z)
 		return false;
 	if (ray.direction.x > 0) {
 		stepX = 1;
-		outX = grid_size;
+		outX = grid_dimensions.x;
 		cb.x = X + 1;
 	} else {
 		stepX = -1;
@@ -368,7 +369,7 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 	}
 	if (ray.direction.y > 0.0f) {
 		stepY = 1;
-		outY = grid_size;
+		outY = grid_dimensions.y;
 		cb.y = Y + 1;
 	} else {
 		stepY = -1, outY = -1;
@@ -376,7 +377,7 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 	}
 	if (ray.direction.z > 0.0f) {
 		stepZ = 1;
-		outZ = grid_size;
+		outZ = grid_dimensions.z;
 		cb.z = Z + 1;
 	} else {
 		stepZ = -1;
@@ -406,7 +407,10 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 
 	// trace primary ray
 	while (1) {
-		if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+		//	return true;
+		//}
+		if (scene.grid[X + Y * grid_dimensions.y + Z * grid_dimensions.z * grid_dimensions.z] != nullptr) {
 			return true;
 		}
 		if (tmax.x < tmax.y) {
@@ -614,15 +618,15 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 		RayQueue& ray = ray_buffer[index];
 
 		ray.distance = VERY_FAR;
-		intersect_voxel(ray, sceneData, ray.normal);
+//		intersect_voxel(ray, sceneData, ray.normal, {32, 32, 32});
 
-		//if (intersect_voxel(ray, sceneData, ray.normal, seed)) {
-			/*atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
+		if (intersect_voxel(ray, sceneData, ray.normal, { 32, 32, 32 })) {
+			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
 			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
 			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
-			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);*/
+			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 			//printf("x:%f y:%f z:%f\n", ray.normal.x, ray.normal.y, ray.normal.z);
-		//}
+		}
 	}
 }
 
@@ -724,7 +728,7 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 
 		ShadowQueue& ray = queue[index];
 
-		if (!intersect_voxel_simple(ray, sceneData)) {
+		if (!intersect_voxel_simple(ray, sceneData, { 32, 32, 32 })) {
 			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.color.r);
 			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.color.g);
 			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.color.b);
@@ -807,8 +811,8 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
 	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);
-	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	//shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+//	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);

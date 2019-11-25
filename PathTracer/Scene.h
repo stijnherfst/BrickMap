@@ -1,18 +1,14 @@
 #pragma once
 
 struct Brick {
-	uint32_t data[16];
-};
-
-class BrickGrid {
-	Brick* brick_grid;
+	uint32_t data[cell_members];
 };
 
 class Scene {
 public:
 	struct GPUScene {
 		uint8_t* voxels;
-		BrickGrid* grid;
+		Brick** grid;
 	} gpuScene;
 
 	void generate();
