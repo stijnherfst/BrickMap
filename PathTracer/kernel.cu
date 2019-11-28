@@ -38,7 +38,7 @@ __device__ int RandomIntBetween0AndMax(unsigned int& seed, int max) {
 }
 
 // A 100% correct but slow implementation
-__device__ bool intersect_aabb_correct(RayQueue& ray, float& tmin) {
+__device__ bool intersect_aabb_correct(const RayQueue& ray, float& tmin) {
 	glm::vec3 box_min = { 0, 0, 0 };
 	glm::vec3 box_max = { grid_size, grid_size, grid_size };
 
@@ -90,7 +90,7 @@ __device__ bool intersect_aabb_correct(RayQueue& ray, float& tmin) {
 	return tmax > glm::max(tmin, 0.f);
 }
 
-__device__ inline bool intersect_aabb_branchless(RayQueue& ray, float& tmin) {
+__device__ inline bool intersect_aabb_branchless(const RayQueue& ray, float& tmin) {
 	glm::vec3 box_min = { 0, 0, 0 };
 	glm::vec3 box_max = { grid_size, grid_size, grid_size };
 	glm::vec3 dir_inv = 1.f / ray.direction;
@@ -105,15 +105,31 @@ __device__ inline bool intersect_aabb_branchless(RayQueue& ray, float& tmin) {
 		t1 = (box_min[i] - ray.origin[i]) * dir_inv[i];
 		t2 = (box_max[i] - ray.origin[i]) * dir_inv[i];
 
-		tmin = glm::max(tmin, glm::min(t1, t2));
-		tmax = glm::min(tmax, glm::max(t1, t2));
+		//tmin = glm::max(tmin, glm::min(t1, t2));
+		//tmax = glm::min(tmax, glm::max(t1, t2));
+		tmin = glm::max(tmin, glm::min(glm::min(t1, t2), tmax));
+		tmax = glm::min(tmax, glm::max(glm::max(t1, t2), tmin));
 	}
 
 	return tmax > glm::max(tmin, 0.f);
 }
 
 // From http://www.jcgt.org/published/0006/02/01/
-__device__ bool intersect_aabb_branchless2(RayQueue& ray, float& tmin) {
+__device__ bool intersect_aabb_branchless2(const RayQueue& ray, float& tmin) {
+	constexpr glm::vec3 box_min = { 0, 0, 0 };
+	constexpr glm::vec3 box_max = { grid_size, grid_size, grid_size };
+
+	const glm::vec3 t1 = (box_min - ray.origin) / ray.direction;
+	const glm::vec3 t2 = (box_max - ray.origin) / ray.direction;
+	const glm::vec3 tMin = glm::min(t1, t2);
+	const glm::vec3 tMax = glm::max(t1, t2);
+
+	tmin = glm::max(glm::max(tMin.x, 0.f), glm::max(tMin.y, tMin.z));
+	return glm::min(tMax.x, glm::min(tMax.y, tMax.z)) > tmin;
+}
+
+// From http://www.jcgt.org/published/0006/02/01/
+__device__ bool intersect_aabb_branchless2(const ShadowQueue& ray, float& tmin) {
 	constexpr glm::vec3 box_min = { 0, 0, 0 };
 	constexpr glm::vec3 box_max = { grid_size, grid_size, grid_size };
 
@@ -211,34 +227,42 @@ __constant__ Sphere spheres[NUM_SPHERES];
 __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm::vec3& normal, glm::uvec3 grid_dimensions) {
 	// Check if ray hits grid AABB
 	float tminn;
-	//if (!intersect_aabb_branchless2(ray, tminn)) {
-	if (!intersect_aabb_correct(ray, tminn)) {
+	if (!intersect_aabb_branchless2(ray, tminn)) {
+	//if (!intersect_aabb_correct(ray, tminn)) {
 		return false;
 	}
 
 	// Move ray to hitpoint
 	glm::vec3 origin = ray.origin;
-	glm::vec3 grid_center(glm::vec3(grid_dimensions) / 2.f);
 	if (tminn > 0) {
-		// Maybe this needs to be a normal instead of pointing to the center as it may cause fringing at the edges of a voxel
 		origin += ray.direction * tminn;
-		origin += glm::normalize(grid_center - origin) * epsilon;
-		origin /= 8.f;
+
+		constexpr glm::vec3 grid_center(grid_size / 2.f);
+		glm::vec3 to_center = glm::abs(grid_center - origin);
+		glm::vec3 signs = glm::sign(origin - grid_center);
+		to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
+		normal = signs * glm::trunc(to_center + 0.000001f);
+
+		origin += -normal * epsilon;
 	}
 
 	// Initialize 
 	glm::vec3 cb, tmax, tdelta;
-	int stepX, outX, X = (int)origin.x;
-	int stepY, outY, Y = (int)origin.y;
-	int stepZ, outZ, Z = (int)origin.z;
+	int stepX, outX, X = ((int)origin.x) / 8;
+	int stepY, outY, Y = ((int)origin.y) / 8;
+	int stepZ, outZ, Z = ((int)origin.z) / 8;
+	origin /= 8.f;
 
+	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides 
 	if (X < 0 || X >= grid_dimensions.x || Y < 0 || Y >= grid_dimensions.y || Z < 0 || Z >= grid_dimensions.z) {
+		//printf("full X: %i Y: %i Z: %i Bounce:%i Innie:%i\n", X, Y, Z, ray.bounces, innie);
 		return false;
 	}
+
 	if (ray.direction.x > 0) {
 		stepX = 1;
 		outX = grid_dimensions.x;
-		cb.x = X + 1;
+		cb.x = (X + 1);
 	} else {
 		stepX = -1;
 		outX = -1;
@@ -247,7 +271,7 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	if (ray.direction.y > 0.0f) {
 		stepY = 1;
 		outY = grid_dimensions.y;
-		cb.y = Y + 1;
+		cb.y = (Y + 1);
 	} else {
 		stepY = -1, outY = -1;
 		cb.y = Y;
@@ -255,7 +279,7 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	if (ray.direction.z > 0.0f) {
 		stepZ = 1;
 		outZ = grid_dimensions.z;
-		cb.z = Z + 1;
+		cb.z = (Z + 1);
 	} else {
 		stepZ = -1;
 		outZ = -1;
@@ -282,25 +306,6 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 		tmax.z = 1000000;
 	float distance = 0.f;
 
-	glm::vec3 to_center = glm::abs(grid_center - origin);
-	glm::vec3 signs = glm::sign(to_center);
-	to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z)); 
-	normal = signs * glm::trunc(to_center + 0.0000001f);
-	//printf("x:%f y:%f z:%f\n", to_center.x, to_center.y, to_center.z);
-
-
-	//glm::vec3 box_min = { 0, 0, 0 };
-	//glm::vec3 box_max = { grid_size, grid_size, grid_size };
-
-	//glm::vec3 c = (box_min + box_max) * 0.5f;
-	//glm::vec3 p = origin - c;
-	//glm::vec3 d = (box_min - box_max) * 0.5f;
-	//float bias = 1.000001f;
-
-	//glm::vec3 result = glm::normalize(glm::floor(glm::vec3(p.x / abs(d.x) * bias,
-	//				p.y / abs(d.y) * bias,
-	//				p.z / abs(d.z) * bias)));
-	//normal = -result;
 	// Stepping through grid
 	while (1) {
 		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
@@ -310,6 +315,7 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 		//}
 
 		if (scene.grid[X + Y * grid_dimensions.y + Z * grid_dimensions.z * grid_dimensions.z] != nullptr) {
+			ray.distance = cell_size * distance + glm::max(tminn, 0.f);
 			return true;
 		}
 
@@ -350,18 +356,46 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 	return false;
 }
 
-__device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene scene, glm::uvec3 grid_dimensions) {
-	glm::vec3 cb, tmax, tdelta;
-	int stepX, outX, X = (int)ray.origin.x;
-	int stepY, outY, Y = (int)ray.origin.y;
-	int stepZ, outZ, Z = (int)ray.origin.z;
-
-	if (X < 0 || X >= grid_dimensions.x || Y < 0 || Y >= grid_dimensions.y || Z < 0 || Z >= grid_dimensions.z)
+__device__ inline bool intersect_voxel_simple(const ShadowQueue& ray, Scene::GPUScene scene, glm::uvec3 grid_dimensions) {
+	// Check if ray hits grid AABB
+	float tminn;
+	if (!intersect_aabb_branchless2(ray, tminn)) {
 		return false;
+	}
+
+	// Move ray to hitpoint
+	glm::vec3 origin = ray.origin;
+	glm::vec3 grid_center(grid_size / 2.f);
+	if (tminn > 0) {
+		// Maybe this needs to be a normal instead of pointing to the center as it may cause fringing at the edges of a voxel
+		origin += ray.direction * tminn;
+
+		glm::vec3 to_center = glm::abs(grid_center - origin);
+		glm::vec3 signs = glm::sign(origin - grid_center);
+		to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
+		glm::vec3 normal = signs * glm::trunc(to_center + 0.000001f);
+
+		origin += -normal * epsilon;
+	}
+
+	origin /= 8.f;
+
+	// Initialize
+	glm::vec3 cb, tmax, tdelta;
+	int stepX, outX, X = (int)origin.x;
+	int stepY, outY, Y = (int)origin.y;
+	int stepZ, outZ, Z = (int)origin.z;
+
+	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides 
+	if (X < 0 || X >= grid_dimensions.x || Y < 0 || Y >= grid_dimensions.y || Z < 0 || Z >= grid_dimensions.z) {
+		//printf("simple X: %i Y: %i Z: %i\n", X, Y, Z);
+		return false;
+	}
+
 	if (ray.direction.x > 0) {
 		stepX = 1;
 		outX = grid_dimensions.x;
-		cb.x = X + 1;
+		cb.x = (X + 1);
 	} else {
 		stepX = -1;
 		outX = -1;
@@ -370,7 +404,7 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 	if (ray.direction.y > 0.0f) {
 		stepY = 1;
 		outY = grid_dimensions.y;
-		cb.y = Y + 1;
+		cb.y = (Y + 1);
 	} else {
 		stepY = -1, outY = -1;
 		cb.y = Y;
@@ -378,7 +412,7 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 	if (ray.direction.z > 0.0f) {
 		stepZ = 1;
 		outZ = grid_dimensions.z;
-		cb.z = Z + 1;
+		cb.z = (Z + 1);
 	} else {
 		stepZ = -1;
 		outZ = -1;
@@ -387,52 +421,55 @@ __device__ inline bool intersect_voxel_simple(ShadowQueue& ray, Scene::GPUScene 
 	float rxr, ryr, rzr;
 	if (ray.direction.x != 0) {
 		rxr = 1.0f / ray.direction.x;
-		tmax.x = (cb.x - ray.origin.x) * rxr;
+		tmax.x = (cb.x - origin.x) * rxr;
 		tdelta.x = stepX * rxr;
 	} else
 		tmax.x = 1000000;
 	if (ray.direction.y != 0) {
 		ryr = 1.0f / ray.direction.y;
-		tmax.y = (cb.y - ray.origin.y) * ryr;
+		tmax.y = (cb.y - origin.y) * ryr;
 		tdelta.y = stepY * ryr;
 	} else
 		tmax.y = 1000000;
 	if (ray.direction.z != 0) {
 		rzr = 1.0f / ray.direction.z;
-		tmax.z = (cb.z - ray.origin.z) * rzr;
+		tmax.z = (cb.z - origin.z) * rzr;
 		tdelta.z = stepZ * rzr;
 	} else
 		tmax.z = 1000000;
-	// start stepping
 
-	// trace primary ray
+	// Stepping through grid
 	while (1) {
 		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+		//	//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
+		//	ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
 		//	return true;
 		//}
+
 		if (scene.grid[X + Y * grid_dimensions.y + Z * grid_dimensions.z * grid_dimensions.z] != nullptr) {
 			return true;
 		}
+
 		if (tmax.x < tmax.y) {
 			if (tmax.x < tmax.z) {
-				X = X + stepX;
+				X += stepX;
 				if (X == outX)
 					return false;
 				tmax.x += tdelta.x;
 			} else {
-				Z = Z + stepZ;
+				Z += stepZ;
 				if (Z == outZ)
 					return false;
 				tmax.z += tdelta.z;
 			}
 		} else {
 			if (tmax.y < tmax.z) {
-				Y = Y + stepY;
+				Y += stepY;
 				if (Y == outY)
 					return false;
 				tmax.y += tdelta.y;
 			} else {
-				Z = Z + stepZ;
+				Z += stepZ;
 				if (Z == outZ)
 					return false;
 				tmax.z += tdelta.z;
@@ -618,13 +655,14 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 		RayQueue& ray = ray_buffer[index];
 
 		ray.distance = VERY_FAR;
-//		intersect_voxel(ray, sceneData, ray.normal, {32, 32, 32});
+		//intersect_voxel(ray, sceneData, ray.normal, {32, 32, 32});
 
 		if (intersect_voxel(ray, sceneData, ray.normal, { 32, 32, 32 })) {
-			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
-			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
-			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
-			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
+			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x / 2.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y / 2.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z / 2.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 			//printf("x:%f y:%f z:%f\n", ray.normal.x, ray.normal.y, ray.normal.z);
 		}
 	}
@@ -653,16 +691,12 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 
 		if (ray.distance < VERY_FAR) {
 			ray.origin += ray.direction * ray.distance;
-
-			glm::vec3 normal = ray.normal;
-			object_color = glm::vec3(1.f, 0.f, 1.f);
-
 			//Prevent self-intersection
-			ray.origin += normal * epsilon;
+			ray.origin += ray.normal * 2.f * epsilon;
 
 			// Generate new shadow ray
 			glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
-			float sunLight = dot(normal, sunSampleDir);
+			float sunLight = dot(ray.normal, sunSampleDir);
 
 			// < 0.f means sun is behind the surface
 			if (sunLight > 0.f) {
@@ -683,9 +717,9 @@ __global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* 
 
 				// Transform to hemisphere coordinate system
 				glm::vec3 u, v;
-				computeOrthonormalBasisNaive(normal, &u, &v);
+				computeOrthonormalBasisNaive(ray.normal, &u, &v);
 				// Get sample on hemisphere
-				ray.direction = glm::normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + normal * sqrt(1 - r2));
+				ray.direction = glm::normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + ray.normal * sqrt(1 - r2));
 			}
 
 			//Russian roullete
@@ -749,9 +783,8 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
 	glm::vec4 cl = glm::vec4(color.r, color.g, color.b, 1) / color.a;
 	cl.a = 1;
 
-	//surf2Dwrite<glm::vec4>(glm::pow(cl / (cl + 1.f), glm::vec4(1.0f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
-	//surf2Dwrite<glm::vec4>(cl, surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
-	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.0f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
+	surf2Dwrite<glm::vec4>(cl, surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
+	//surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.0f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 
 cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene::GPUScene sceneData, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
@@ -811,8 +844,8 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
 	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);
-	//shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-//	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);

@@ -21,7 +21,7 @@ void Scene::generate() {
 	{
 		std::vector<Brick> scene;
 		scene.resize(cells * cells * cells);
-
+		
 		for (int x = 0; x < grid_size; x++) {
 			for (int y = 0; y < grid_size; y++) {
 				for (int z = 0; z < grid_size; z++) {
@@ -50,16 +50,19 @@ void Scene::generate() {
 		std::vector<Brick*> grid{};
 		grid.resize(cells * cells * cells);
 
+		int count = 0;
 		for (int i = 0; i < cells * cells * cells; i++) {
 			bool empty = true;
 			for (int j = 0; j < cell_members; j++) {
 				empty = empty && !scene[i].data[j];
 			}
 			if (!empty) {
+				count++;
 				cuda(Malloc(&grid[i], sizeof(Brick)));
 				cuda(Memcpy(grid[i], &scene[i], sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
 			}
 		}
+		printf("%i", count);
 
 		//int count = 0;
 		//for (int i = 0; i < cells * cells * cells; i++) {
