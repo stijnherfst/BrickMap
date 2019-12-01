@@ -48,8 +48,8 @@ void Scene::generate() {
 
 
 		cuda(Malloc(&gpuScene.grid, cells * cells * cells * sizeof(Brick*)));
-		std::vector<Brick*> grid{};
-		grid.resize(cells * cells * cells);
+		std::vector<Brick*> grid;
+		grid.resize(cells * cells * cells, nullptr);
 
 		int count = 0;
 		for (int i = 0; i < cells * cells * cells; i++) {
