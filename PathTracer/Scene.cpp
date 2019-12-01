@@ -39,6 +39,7 @@ void Scene::generate() {
 					bool set = sqrt((x - 128) * (x - 128) + (y - 128) * (y - 128) + (z - 128) * (z - 128)) < 128;
 
 					if (set) {
+						//memset(&scene[sub_x + sub_y + sub_z].data[0], 1, 64);
 						scene[sub_x + sub_y + sub_z].data[sub_data] |= (1 << bit_position);
 					}
 				}

@@ -129,13 +129,13 @@ __device__ inline bool intersect_aabb_branchless(const RayQueue& ray, float& tmi
 //}
 
 // From http://www.jcgt.org/published/0006/02/01/
-template<typename T>
-__device__ bool intersect_aabb_branchless2(const T& ray, float& tmin) {
+//template <typename T>
+__device__ bool intersect_aabb_branchless2(const glm::vec3& origin, const glm::vec3& direction, float& tmin) {
 	constexpr glm::vec3 box_min = { 0, 0, 0 };
 	constexpr glm::vec3 box_max = { grid_size, grid_size, grid_size };
 
-	const glm::vec3 t1 = (box_min - ray.origin) / ray.direction;
-	const glm::vec3 t2 = (box_max - ray.origin) / ray.direction;
+	const glm::vec3 t1 = (box_min - origin) / direction;
+	const glm::vec3 t2 = (box_max - origin) / direction;
 	const glm::vec3 tMin = glm::min(t1, t2);
 	const glm::vec3 tMax = glm::max(t1, t2);
 
@@ -173,70 +173,142 @@ enum Refl_t { DIFF,
 			  PHONG,
 			  LIGHT };
 
-inline __host__ __device__ float dot(const glm::vec4& v1, const glm::vec3& v2) {
-	return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+__device__ inline bool intersect_brick(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Brick* brick) {
+	origin.x = fmod(origin.x, 8.f);
+	origin.y = fmod(origin.y, 8.f);
+	origin.z = fmod(origin.z, 8.f);
+	//poss = poss % 8;
+	// Initialize
+	glm::vec3 cb, tmax, tdelta;
+	int stepX, outX, X = (int)origin.x;
+	int stepY, outY, Y = (int)origin.y;
+	int stepZ, outZ, Z = (int)origin.z;
+
+
+	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
+	if (X >= cell_size || Y >= cell_size || Z >= cell_size) {
+		//printf("mhmm positive\n");
+		return false;
+	}
+
+	if (X < 0 || Y < 0 || Z < 0) {
+		//printf("mhmm negative\n");
+		return false;
+	}
+
+
+	if (direction.x > 0) {
+		stepX = 1;
+		outX = cell_size;
+		cb.x = (X + 1);
+	} else {
+		stepX = -1;
+		outX = -1;
+		cb.x = X;
+	}
+	if (direction.y > 0.0f) {
+		stepY = 1;
+		outY = cell_size;
+		cb.y = (Y + 1);
+	} else {
+		stepY = -1;
+		outY = -1;
+		cb.y = Y;
+	}
+	if (direction.z > 0.0f) {
+		stepZ = 1;
+		outZ = cell_size;
+		cb.z = (Z + 1);
+	} else {
+		stepZ = -1;
+		outZ = -1;
+		cb.z = Z;
+	}
+	float rxr, ryr, rzr;
+	if (direction.x != 0) {
+		rxr = 1.0f / direction.x;
+		tmax.x = (cb.x - origin.x) * rxr;
+		tdelta.x = stepX * rxr;
+	} else
+		tmax.x = 1000000;
+	if (direction.y != 0) {
+		ryr = 1.0f / direction.y;
+		tmax.y = (cb.y - origin.y) * ryr;
+		tdelta.y = stepY * ryr;
+	} else
+		tmax.y = 1000000;
+	if (direction.z != 0) {
+		rzr = 1.0f / direction.z;
+		tmax.z = (cb.z - origin.z) * rzr;
+		tdelta.z = stepZ * rzr;
+	} else
+		tmax.z = 1000000;
+	distance = 0.f;
+
+	// Stepping through grid
+	while (1) {
+		int sub_data = (X + Y * cell_size + Z * cell_size * cell_size) / 32;
+		int bit = (X + Y * cell_size + Z * cell_size * cell_size) % 32;
+
+		if (sub_data < 0 || sub_data > 15) {
+			printf("uwu");
+		}
+
+		if (bit < 0 || bit > 31) {
+			printf("OwO");
+		}
+
+		if (brick->data[sub_data] & (1 << bit)) {
+			return true;
+		}
+	
+		if (tmax.x < tmax.y) {
+			if (tmax.x < tmax.z) {
+				X += stepX;
+				if (X == outX)
+					return false;
+				distance = tmax.x;
+				tmax.x += tdelta.x;
+				normal = glm::vec3(-stepX, 0, 0);
+			} else {
+				Z += stepZ;
+				if (Z == outZ)
+					return false;
+				distance = tmax.z;
+				tmax.z += tdelta.z;
+				normal = glm::vec3(0, 0, -stepZ);
+			}
+		} else {
+			if (tmax.y < tmax.z) {
+				Y += stepY;
+				if (Y == outY)
+					return false;
+				distance = tmax.y;
+				tmax.y += tdelta.y;
+				normal = glm::vec3(0, -stepY, 0);
+			} else {
+				Z += stepZ;
+				if (Z == outZ)
+					return false;
+				distance = tmax.z;
+				tmax.z += tdelta.z;
+				normal = glm::vec3(0, 0, -stepZ);
+			}
+		}
+	}
+	return false;
 }
 
-struct Sphere {
-	float radius;
-	glm::vec3 position, color;
-	glm::vec3 emmission;
-	Refl_t refl;
-
-	__device__ float intersect(const RayQueue& r) const {
-		glm::vec3 op = position - r.origin;
-		float t;
-		float b = glm::dot(op, r.direction);
-		float disc = b * b - dot(op, op) + radius * radius;
-		if (disc < 0)
-			return 0;
-
-		disc = sqrtf(disc);
-		return (t = b - disc) > epsilon ? t : ((t = b + disc) > epsilon ? t : 0);
-	}
-
-	__device__ float intersect_simple(const ShadowQueue& r) const {
-		glm::vec3 op = position - r.origin;
-		float t;
-		float b = glm::dot(op, r.direction);
-		float disc = b * b - dot(op, op) + radius * radius;
-		if (disc < 0)
-			return 0;
-
-		disc = sqrtf(disc);
-		return (t = b - disc) > epsilon ? t : ((t = b + disc) > epsilon ? t : 0);
-	}
-
-	__device__ glm::vec3 random_point(unsigned int& seed) const {
-		float u = RandomFloat(seed);
-		float v = RandomFloat(seed);
-
-		float cosPhi = 2.0f * u - 1.0f;
-		float sinPhi = sqrt(1.0f - cosPhi * cosPhi);
-		float theta = 2 * pi * v;
-
-		float x = radius * sinPhi * sin(theta);
-		float y = radius * cosPhi;
-		float z = radius * sinPhi * cos(theta);
-
-		return position + glm::vec3(x, y, z);
-	}
-};
-
-__constant__ Sphere spheres[NUM_SPHERES];
-
-__device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm::vec3& normal) {
+__device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Scene::GPUScene scene) {
 	// Check if ray hits grid AABB
 	float tminn;
-	if (!intersect_aabb_branchless2(ray, tminn)) {
-	//if (!intersect_aabb_correct(ray, tminn)) {
+	if (!intersect_aabb_branchless2(origin, direction, tminn)) {
 		return false;
 	}
 
 	// Move ray to hitpoint
-	glm::vec3 origin = ray.origin;
 	if (tminn > 0) {
-		origin += ray.direction * tminn;
+		origin += direction * tminn;
 
 		constexpr glm::vec3 grid_center(grid_size / 2.f);
 		glm::vec3 to_center = glm::abs(grid_center - origin);
@@ -246,40 +318,40 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 
 		origin += -normal * epsilon;
 	}
+	origin /= 8.f;
 
-	// Initialize 
+	// Initialize
 	glm::vec3 cb, tmax, tdelta;
-	int stepX, outX, X = ((int)origin.x); // / 8;
-	int stepY, outY, Y = ((int)origin.y); // / 8;
-	int stepZ, outZ, Z = ((int)origin.z); // / 8;
-	//origin /= 8.f;
+	int stepX, outX, X = ((int)origin.x);
+	int stepY, outY, Y = ((int)origin.y);
+	int stepZ, outZ, Z = ((int)origin.z);
 
-	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides 
-	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size) {
-		//printf("full X: %i Y: %i Z: %i Bounce:%i Innie:%i\n", X, Y, Z, ray.bounces, innie);
+	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
+	if (X < 0 || X >= cells || Y < 0 || Y >= cells || Z < 0 || Z >= cells) {
 		return false;
 	}
 
-	if (ray.direction.x > 0) {
+	if (direction.x > 0) {
 		stepX = 1;
-		outX = grid_size;
+		outX = cells;
 		cb.x = (X + 1);
 	} else {
 		stepX = -1;
 		outX = -1;
 		cb.x = X;
 	}
-	if (ray.direction.y > 0.0f) {
+	if (direction.y > 0.0f) {
 		stepY = 1;
-		outY = grid_size;
+		outY = cells;
 		cb.y = (Y + 1);
 	} else {
-		stepY = -1, outY = -1;
+		stepY = -1;
+		outY = -1;
 		cb.y = Y;
 	}
-	if (ray.direction.z > 0.0f) {
+	if (direction.z > 0.0f) {
 		stepZ = 1;
-		outZ = grid_size;
+		outZ = cells;
 		cb.z = (Z + 1);
 	} else {
 		stepZ = -1;
@@ -287,71 +359,70 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 		cb.z = Z;
 	}
 	float rxr, ryr, rzr;
-	if (ray.direction.x != 0) {
-		rxr = 1.0f / ray.direction.x;
+	if (direction.x != 0) {
+		rxr = 1.0f / direction.x;
 		tmax.x = (cb.x - origin.x) * rxr;
 		tdelta.x = stepX * rxr;
 	} else
 		tmax.x = 1000000;
-	if (ray.direction.y != 0) {
-		ryr = 1.0f / ray.direction.y;
+	if (direction.y != 0) {
+		ryr = 1.0f / direction.y;
 		tmax.y = (cb.y - origin.y) * ryr;
 		tdelta.y = stepY * ryr;
 	} else
 		tmax.y = 1000000;
-	if (ray.direction.z != 0) {
-		rzr = 1.0f / ray.direction.z;
+	if (direction.z != 0) {
+		rzr = 1.0f / direction.z;
 		tmax.z = (cb.z - origin.z) * rzr;
 		tdelta.z = stepZ * rzr;
 	} else
 		tmax.z = 1000000;
-	float distance = 0.f;
+	distance = 0.f;
 
 	// Stepping through grid
 	while (1) {
-		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
-		//	//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
-		//	ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
-		//	return true;
-		//}
-
-		if (scene.grid[X / 8 + (Y / 8) * cells + (Z / 8) * cells * cells] != nullptr) {
-			ray.distance = distance + glm::max(tminn, 0.f);
-			return true;
+		Brick* brick = scene.grid[X + Y * cells + Z * cells * cells];
+		if (brick != nullptr) {
+			float sub_distance = 0.f;
+			if (intersect_brick(origin * 8.f + direction * (distance * 8.f + epsilon), direction, normal, sub_distance, brick)) {
+				distance += sub_distance + glm::max(tminn, 0.f) + epsilon;
+				return true;
+			}
+			//return true;
 		}
 
-		float step_size = 8.f;
+		constexpr int step_size = 1;
 
 		if (tmax.x < tmax.y) {
 			if (tmax.x < tmax.z) {
-				X += stepX * (int)step_size;
+				X += stepX;
 				if (X == outX)
 					return false;
 				distance = tmax.x;
-				tmax.x += tdelta.x * step_size;
+				tmax.x += tdelta.x;
 				normal = glm::vec3(-stepX, 0, 0);
 			} else {
-				Z += stepZ * step_size;
+				Z += stepZ;
 				if (Z == outZ)
 					return false;
 				distance = tmax.z;
-				tmax.z += tdelta.z * step_size;
+				tmax.z += tdelta.z;
 				normal = glm::vec3(0, 0, -stepZ);
 			}
 		} else {
 			if (tmax.y < tmax.z) {
-				Y += stepY * step_size;
+				Y += stepY;
 				if (Y == outY)
 					return false;
 				distance = tmax.y;
-				tmax.y += tdelta.y * step_size;
+				tmax.y += tdelta.y;
 				normal = glm::vec3(0, -stepY, 0);
 			} else {
-				Z += stepZ * step_size;
+				Z += stepZ;
 				if (Z == outZ)
 					return false;
 				distance = tmax.z;
-				tmax.z += tdelta.z * step_size;
+				tmax.z += tdelta.z;
 				normal = glm::vec3(0, 0, -stepZ);
 			}
 		}
@@ -360,126 +431,124 @@ __device__ inline bool intersect_voxel(RayQueue& ray, Scene::GPUScene scene, glm
 }
 
 __device__ inline bool intersect_voxel_simple(const ShadowQueue& ray, Scene::GPUScene scene, glm::uvec3 grid_dimensions) {
-	// Check if ray hits grid AABB
-	float tminn;
-	if (!intersect_aabb_branchless2(ray, tminn)) {
-		//if (!intersect_aabb_correct(ray, tminn)) {
-		return false;
-	}
+	//// Check if ray hits grid AABB
+	//float tminn;
+	//if (!intersect_aabb_branchless2(ray, tminn)) {
+	//	//if (!intersect_aabb_correct(ray, tminn)) {
+	//	return false;
+	//}
 
-	// Move ray to hitpoint
-	glm::vec3 origin = ray.origin;
-	if (tminn > 0) {
-		origin += ray.direction * tminn;
+	//// Move ray to hitpoint
+	//glm::vec3 origin = ray.origin;
+	//if (tminn > 0) {
+	//	origin += ray.direction * tminn;
 
-		constexpr glm::vec3 grid_center(grid_size / 2.f);
-		glm::vec3 to_center = glm::abs(grid_center - origin);
-		glm::vec3 signs = glm::sign(origin - grid_center);
-		to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
-		glm::vec3 normal = signs * glm::trunc(to_center + 0.000001f);
+	//	constexpr glm::vec3 grid_center(grid_size / 2.f);
+	//	glm::vec3 to_center = glm::abs(grid_center - origin);
+	//	glm::vec3 signs = glm::sign(origin - grid_center);
+	//	to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
+	//	glm::vec3 normal = signs * glm::trunc(to_center + 0.000001f);
 
-		origin += -normal * epsilon;
-	}
+	//	origin += -normal * epsilon;
+	//}
 
-	// Initialize
-	glm::vec3 cb, tmax, tdelta;
-	int stepX, outX, X = ((int)origin.x); // / 8;
-	int stepY, outY, Y = ((int)origin.y); // / 8;
-	int stepZ, outZ, Z = ((int)origin.z); // / 8;
-	//origin /= 8.f;
+	//// Initialize
+	//glm::vec3 cb, tmax, tdelta;
+	//int stepX, outX, X = ((int)origin.x); // / 8;
+	//int stepY, outY, Y = ((int)origin.y); // / 8;
+	//int stepZ, outZ, Z = ((int)origin.z); // / 8;
+	////origin /= 8.f;
 
-	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
-	if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size) {
-		//printf("full X: %i Y: %i Z: %i Bounce:%i Innie:%i\n", X, Y, Z, ray.bounces, innie);
-		return false;
-	}
+	//// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
+	//if (X < 0 || X >= grid_size || Y < 0 || Y >= grid_size || Z < 0 || Z >= grid_size) {
+	//	//printf("full X: %i Y: %i Z: %i Bounce:%i Innie:%i\n", X, Y, Z, ray.bounces, innie);
+	//	return false;
+	//}
 
-	if (ray.direction.x > 0) {
-		stepX = 1;
-		outX = grid_size;
-		cb.x = (X + 1);
-	} else {
-		stepX = -1;
-		outX = -1;
-		cb.x = X;
-	}
-	if (ray.direction.y > 0.0f) {
-		stepY = 1;
-		outY = grid_size;
-		cb.y = (Y + 1);
-	} else {
-		stepY = -1, outY = -1;
-		cb.y = Y;
-	}
-	if (ray.direction.z > 0.0f) {
-		stepZ = 1;
-		outZ = grid_size;
-		cb.z = (Z + 1);
-	} else {
-		stepZ = -1;
-		outZ = -1;
-		cb.z = Z;
-	}
-	float rxr, ryr, rzr;
-	if (ray.direction.x != 0) {
-		rxr = 1.0f / ray.direction.x;
-		tmax.x = (cb.x - origin.x) * rxr;
-		tdelta.x = stepX * rxr;
-	} else
-		tmax.x = 1000000;
-	if (ray.direction.y != 0) {
-		ryr = 1.0f / ray.direction.y;
-		tmax.y = (cb.y - origin.y) * ryr;
-		tdelta.y = stepY * ryr;
-	} else
-		tmax.y = 1000000;
-	if (ray.direction.z != 0) {
-		rzr = 1.0f / ray.direction.z;
-		tmax.z = (cb.z - origin.z) * rzr;
-		tdelta.z = stepZ * rzr;
-	} else
-		tmax.z = 1000000;
+	//if (ray.direction.x > 0) {
+	//	stepX = 1;
+	//	outX = grid_size;
+	//	cb.x = (X + 1);
+	//} else {
+	//	stepX = -1;
+	//	outX = -1;
+	//	cb.x = X;
+	//}
+	//if (ray.direction.y > 0.0f) {
+	//	stepY = 1;
+	//	outY = grid_size;
+	//	cb.y = (Y + 1);
+	//} else {
+	//	stepY = -1, outY = -1;
+	//	cb.y = Y;
+	//}
+	//if (ray.direction.z > 0.0f) {
+	//	stepZ = 1;
+	//	outZ = grid_size;
+	//	cb.z = (Z + 1);
+	//} else {
+	//	stepZ = -1;
+	//	outZ = -1;
+	//	cb.z = Z;
+	//}
+	//float rxr, ryr, rzr;
+	//if (ray.direction.x != 0) {
+	//	rxr = 1.0f / ray.direction.x;
+	//	tmax.x = (cb.x - origin.x) * rxr;
+	//	tdelta.x = stepX * rxr;
+	//} else
+	//	tmax.x = 1000000;
+	//if (ray.direction.y != 0) {
+	//	ryr = 1.0f / ray.direction.y;
+	//	tmax.y = (cb.y - origin.y) * ryr;
+	//	tdelta.y = stepY * ryr;
+	//} else
+	//	tmax.y = 1000000;
+	//if (ray.direction.z != 0) {
+	//	rzr = 1.0f / ray.direction.z;
+	//	tmax.z = (cb.z - origin.z) * rzr;
+	//	tdelta.z = stepZ * rzr;
+	//} else
+	//	tmax.z = 1000000;
 
-	// Stepping through grid
-	while (1) {
-		//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
-		//	//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
-		//	ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
-		//	return true;
-		//}
+	//// Stepping through grid
+	//while (1) {
+	//	//if (scene.voxels[X + Y * grid_size + Z * grid_size * grid_size]) {
+	//	//	//printf("bounces:%i x:%f y:%f z:%f\n", ray.bounces, origin.x, origin.y, origin.z);
+	//	//	ray.distance = distance + glm::max(tminn, 0.f) + epsilon;
+	//	//	return true;
+	//	//}
 
-		if (scene.grid[X / 8 + (Y / 8) * cells + (Z / 8) * cells * cells] != nullptr) {
-			return true;
-		}
+	//	if (scene.grid[X / 8 + (Y / 8) * cells + (Z / 8) * cells * cells] != nullptr) {
+	//		return true;
+	//	}
 
-		float step_size = 8.f;
-
-		if (tmax.x < tmax.y) {
-			if (tmax.x < tmax.z) {
-				X += stepX * (int)step_size;
-				if (X == outX)
-					return false;
-				tmax.x += tdelta.x * step_size;
-			} else {
-				Z += stepZ * step_size;
-				if (Z == outZ)
-					return false;
-				tmax.z += tdelta.z * step_size;
-			}
-		} else {
-			if (tmax.y < tmax.z) {
-				Y += stepY * step_size;
-				if (Y == outY)
-					return false;
-				tmax.y += tdelta.y * step_size;
-			} else {
-				Z += stepZ * step_size;
-				if (Z == outZ)
-					return false;
-				tmax.z += tdelta.z * step_size;
-			}
-		}
-	}
+	//	if (tmax.x < tmax.y) {
+	//		if (tmax.x < tmax.z) {
+	//			X += stepX;
+	//			if (X == outX)
+	//				return false;
+	//			tmax.x += tdelta.x;
+	//		} else {
+	//			Z += stepZ;
+	//			if (Z == outZ)
+	//				return false;
+	//			tmax.z += tdelta.z;
+	//		}
+	//	} else {
+	//		if (tmax.y < tmax.z) {
+	//			Y += stepY;
+	//			if (Y == outY)
+	//				return false;
+	//			tmax.y += tdelta.y;
+	//		} else {
+	//			Z += stepZ;
+	//			if (Z == outZ)
+	//				return false;
+	//			tmax.z += tdelta.z;
+	//		}
+	//	}
+	//}
 	return false;
 }
 
@@ -661,11 +730,14 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 		ray.distance = VERY_FAR;
 		//intersect_voxel(ray, sceneData, ray.normal, {32, 32, 32});
 
-		if (intersect_voxel(ray, sceneData, ray.normal)) {
-			glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
-			atomicAdd(&blit_buffer[ray.pixel_index].r, yoyo.x / 255.f);
-			atomicAdd(&blit_buffer[ray.pixel_index].g, yoyo.y / 255.f);
-			atomicAdd(&blit_buffer[ray.pixel_index].b, yoyo.z / 255.f);
+		if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
+			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
+			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
+			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
+			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
 			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 			//printf("x:%f y:%f z:%f\n", ray.normal.x, ray.normal.y, ray.normal.z);
 		}
@@ -799,14 +871,14 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	if (first_time) {
 		first_time = false;
 
-		Sphere sphere_data[NUM_SPHERES] = { { 16.5, { 0, 40, 16.5f }, { 1, 1, 1 }, { 0, 0, 0 }, DIFF },
+		/*	Sphere sphere_data[NUM_SPHERES] = { { 16.5, { 0, 40, 16.5f }, { 1, 1, 1 }, { 0, 0, 0 }, DIFF },
 											{ 16.5, { 40, 0, 16.5f }, { 0.5, 0.5, 0.06 }, { 0, 0, 0 }, DIFF },
 											{ 16.5, { -40, -50, 36.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, DIFF },
 											{ 16.5, { -40, -50, 16.5f }, { 0.6, 0.5, 0.4 }, { 0, 0, 0 }, DIFF },
 											{ 1e4f, { 0, 0, -1e4f - 20 }, { 1, 1, 1 }, { 0, 0, 0 }, DIFF },
 											{ 20, { 0, -80, 20 }, { 1.0, 0.0, 0.0 }, { 0, 0, 0 }, DIFF },
 											{ 9, { 0, -80, 120.0f }, { 0.0, 1.0, 0.0 }, { 3, 3, 3 }, LIGHT } };
-		cudaMemcpyToSymbol(spheres, sphere_data, NUM_SPHERES * sizeof(Sphere));
+		cudaMemcpyToSymbol(spheres, sphere_data, NUM_SPHERES * sizeof(Sphere));*/
 
 		float sun_angular = cos(sunSize * pi / 180.f);
 		cuda(MemcpyToSymbol(sunAngularDiameterCos, &sun_angular, sizeof(float)));
@@ -819,7 +891,6 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	static float last_lensradius = 0.02f;
 
 	cuda_err = cuda(BindSurfaceToArray(surf, array));
-
 
 	if (cuda_err) {
 		return cuda_err;
