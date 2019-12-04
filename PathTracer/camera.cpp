@@ -3,7 +3,7 @@
 void Camera::handle_input(GLFWwindow* window, double delta) {
 	float speed = 1;
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
-		speed = 40;
+		speed = 400;
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_W)) {

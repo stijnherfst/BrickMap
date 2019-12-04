@@ -422,10 +422,12 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 
 	// Stepping through grid
 	while (1) {
-		Brick* brick = scene.brick_grid[X + Y * cells + Z * cells * cells];
-		if (brick != nullptr) {
+		//Brick* brick = scene.brick_grid
+		//	scene.brick_grid[X + Y * cells + Z * cells * cells];
+		uint32_t index = scene.brick_grid[X + Y * cells + Z * cells * cells];
+		if (index != UINT_MAX) {
 			float sub_distance = 0.f;
-			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, brick)) {
+			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &scene.bricks[index])) {
 				distance = new_distance * 8.f + sub_distance + glm::max(tminn, 0.f) + epsilon;
 				return true;
 			}
@@ -551,14 +553,25 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 
 	// Stepping through grid
 	while (1) {
-		Brick* brick = scene.brick_grid[X + Y * cells + Z * cells * cells];
+
+		uint32_t index = scene.brick_grid[X + Y * cells + Z * cells * cells];
+		if (index != UINT_MAX) {
+			float sub_distance = 0.f;
+			glm::vec3 normal;
+			if (intersect_brick(origin * 8.f + direction * (distance * 8.f + epsilon), direction, normal, sub_distance, &scene.bricks[index])) {
+				return true;
+			}
+		}
+
+
+		/*Brick* brick = scene.brick_grid[X + Y * cells + Z * cells * cells];
 		if (brick != nullptr) {
 			float sub_distance = 0.f;
 			glm::vec3 normal;
 			if (intersect_brick(origin * 8.f + direction * (distance * 8.f + epsilon), direction, normal, sub_distance, brick)) {
 				return true;
 			}
-		}
+		}*/
 
 		if (tmax.x < tmax.y) {
 			if (tmax.x < tmax.z) {
@@ -731,9 +744,9 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 
 		if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
 			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
-			//atomicAdd(&blit_buffer[ray.pixel_index].r, yoyo.x / 255.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].g, yoyo.y / 255.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].b, yoyo.z / 255.f);
+			/*atomicAdd(&blit_buffer[ray.pixel_index].r, yoyo.x / 255.f);
+			atomicAdd(&blit_buffer[ray.pixel_index].g, yoyo.y / 255.f);
+			atomicAdd(&blit_buffer[ray.pixel_index].b, yoyo.z / 255.f);*/
 			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 20.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 20.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 20.f);

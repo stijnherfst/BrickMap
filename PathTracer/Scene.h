@@ -7,7 +7,8 @@ struct Brick {
 class Scene {
 public:
 	struct GPUScene {
-		Brick** brick_grid;
+		uint32_t* brick_grid;
+		Brick* bricks;
 	} gpuScene;
 
 	void generate();
