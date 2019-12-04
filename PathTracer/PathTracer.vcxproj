@@ -63,6 +63,9 @@
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <AdditionalOptions>--ftz=true %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
+    <CudaLink>
+      <AdditionalOptions>-lineinfo %(AdditionalOptions)</AdditionalOptions>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -86,7 +89,9 @@
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <AdditionalOptions>-lineinfo %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
+    <CudaLink />
   </ItemDefinitionGroup>
   <ItemGroup>
     <CudaCompile Include="kernel.cu">
@@ -123,6 +128,7 @@
     <ClCompile Include="scene.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="SimplexNoise.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
     </ClCompile>
@@ -144,6 +150,7 @@
     <ClInclude Include="interop.h" />
     <ClInclude Include="performance_measure.h" />
     <ClInclude Include="scene.h" />
+    <ClInclude Include="SimplexNoise.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="sunsky.cuh" />
     <ClInclude Include="variables.h" />

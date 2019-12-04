@@ -80,6 +80,9 @@
     <ClInclude Include="scene.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SimplexNoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="assert_cuda.cpp">
@@ -128,6 +131,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="scene.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SimplexNoise.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

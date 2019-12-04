@@ -40,7 +40,7 @@ __device__ int RandomIntBetween0AndMax(unsigned int& seed, int max) {
 // A 100% correct but slow implementation
 __device__ bool intersect_aabb_correct(const RayQueue& ray, float& tmin) {
 	glm::vec3 box_min = { 0, 0, 0 };
-	glm::vec3 box_max = { grid_size, grid_size, grid_size };
+	glm::vec3 box_max = { grid_size, grid_size, grid_height };
 
 	tmin = (box_min[0] - ray.origin[0]) / ray.direction.x;
 	float tmax = (box_max[0] - ray.origin[0]) / ray.direction.x;
@@ -92,7 +92,7 @@ __device__ bool intersect_aabb_correct(const RayQueue& ray, float& tmin) {
 
 __device__ inline bool intersect_aabb_branchless(const glm::vec3& origin, const glm::vec3& direction, float& tmin) {
 	glm::vec3 box_min = { 0, 0, 0 };
-	glm::vec3 box_max = { grid_size, grid_size, grid_size };
+	glm::vec3 box_max = { grid_size, grid_size, grid_height };
 	glm::vec3 dir_inv = 1.f / direction;
 
 	float t1 = (box_min[0] - origin[0]) * dir_inv[0];
@@ -132,7 +132,7 @@ __device__ inline bool intersect_aabb_branchless(const glm::vec3& origin, const 
 //template <typename T>
 __device__ bool intersect_aabb_branchless2(const glm::vec3& origin, const glm::vec3& direction, float& tmin) {
 	constexpr glm::vec3 box_min = { 0, 0, 0 };
-	constexpr glm::vec3 box_max = { grid_size, grid_size, grid_size };
+	constexpr glm::vec3 box_max = { grid_size, grid_size, grid_height };
 
 	const glm::vec3 t1 = (box_min - origin) / direction;
 	const glm::vec3 t2 = (box_max - origin) / direction;
@@ -174,127 +174,167 @@ enum Refl_t { DIFF,
 			  LIGHT };
 
 __device__ inline bool intersect_brick(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Brick* brick) {
-	origin.x = fmod(origin.x, 8.f);
-	origin.y = fmod(origin.y, 8.f);
-	origin.z = fmod(origin.z, 8.f);
-	//poss = poss % 8;
-	// Initialize
+	origin = glm::mod(origin, 8.f);
+	glm::ivec3 pos = origin;
+
+	glm::ivec3 out;
+	glm::ivec3 step;
 	glm::vec3 cb, tmax, tdelta;
-	int stepX, outX, X = (int)origin.x;
-	int stepY, outY, Y = (int)origin.y;
-	int stepZ, outZ, Z = (int)origin.z;
 
-	//if (X >= cell_size || Y >= cell_size || Z >= cell_size) {
-	//	printf("mhmm positive\n");
-	//	return false;
-	//}
+	cb.x = direction.x > 0 ? pos.x + 1 : pos.x;
+	cb.y = direction.y > 0 ? pos.y + 1 : pos.y;
+	cb.z = direction.z > 0 ? pos.z + 1 : pos.z;
+	out.x = direction.x > 0 ? cell_size : -1;
+	out.y = direction.y > 0 ? cell_size : -1;
+	out.z = direction.z > 0 ? cell_size : -1;
+	step.x = direction.x > 0 ? 1 : -1;
+	step.y = direction.y > 0 ? 1 : -1;
+	step.z = direction.z > 0 ? 1 : -1;
 
-	//if (X < 0 || Y < 0 || Z < 0) {
-	//	//printf("mhmm negative\n");
-	//	return false;
-	//}
-
-
-	if (direction.x > 0) {
-		stepX = 1;
-		outX = cell_size;
-		cb.x = (X + 1);
-	} else {
-		stepX = -1;
-		outX = -1;
-		cb.x = X;
-	}
-	if (direction.y > 0.0f) {
-		stepY = 1;
-		outY = cell_size;
-		cb.y = (Y + 1);
-	} else {
-		stepY = -1;
-		outY = -1;
-		cb.y = Y;
-	}
-	if (direction.z > 0.0f) {
-		stepZ = 1;
-		outZ = cell_size;
-		cb.z = (Z + 1);
-	} else {
-		stepZ = -1;
-		outZ = -1;
-		cb.z = Z;
-	}
 	float rxr, ryr, rzr;
 	if (direction.x != 0) {
 		rxr = 1.0f / direction.x;
 		tmax.x = (cb.x - origin.x) * rxr;
-		tdelta.x = stepX * rxr;
+		tdelta.x = step.x * rxr;
 	} else
 		tmax.x = 1000000;
 	if (direction.y != 0) {
 		ryr = 1.0f / direction.y;
 		tmax.y = (cb.y - origin.y) * ryr;
-		tdelta.y = stepY * ryr;
+		tdelta.y = step.y * ryr;
 	} else
 		tmax.y = 1000000;
 	if (direction.z != 0) {
 		rzr = 1.0f / direction.z;
 		tmax.z = (cb.z - origin.z) * rzr;
-		tdelta.z = stepZ * rzr;
+		tdelta.z = step.z * rzr;
 	} else
 		tmax.z = 1000000;
+	
 	distance = 0.f;
-
+	int smallest_component = -1;
 	// Stepping through grid
 	while (1) {
-		int sub_data = (X + Y * cell_size + Z * cell_size * cell_size) / 32;
-		int bit = (X + Y * cell_size + Z * cell_size * cell_size) % 32;
-
-		//if (sub_data < 0 || sub_data > 15) {
-		//	printf("uwu");
-		//}
-
-		//if (bit < 0 || bit > 31) {
-		//	printf("OwO");
-		//}
+		int sub_data = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) / 32;
+		int bit = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) % 32;
 
 		if (brick->data[sub_data] & (1 << bit)) {
+			if (smallest_component > -1) {
+				//distance = tmax[smallest_component]	-tdelta[smallest_component];
+				normal = glm::vec3(0, 0, 0);
+				normal[smallest_component] = -step[smallest_component];
+			}
 			return true;
 		}
-	
+		smallest_component = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
+
+		//	pos[smallest_component] += step[smallest_component];
+		//	if (pos[smallest_component] == out[smallest_component]) {
+		//		return false;
+		//	}
+		//	distance = tmax[smallest_component];
+		//	tmax[smallest_component] += tdelta[smallest_component];
+		//normal = glm::vec3(0, 0, 0);
+		//normal[smallest_component] = -step[smallest_component];
+
+		distance = glm::min(tmax.x, glm::min(tmax.y, tmax.z));
+
 		if (tmax.x < tmax.y) {
 			if (tmax.x < tmax.z) {
-				X += stepX;
-				if (X == outX)
+				pos.x += step.x;
+				if (pos.x == out.x)
 					return false;
-				distance = tmax.x;
 				tmax.x += tdelta.x;
-				normal = glm::vec3(-stepX, 0, 0);
 			} else {
-				Z += stepZ;
-				if (Z == outZ)
+				pos.z += step.z;
+				if (pos.z == out.z)
 					return false;
-				distance = tmax.z;
 				tmax.z += tdelta.z;
-				normal = glm::vec3(0, 0, -stepZ);
 			}
 		} else {
 			if (tmax.y < tmax.z) {
-				Y += stepY;
-				if (Y == outY)
+				pos.y += step.y;
+				if (pos.y == out.y)
 					return false;
-				distance = tmax.y;
 				tmax.y += tdelta.y;
-				normal = glm::vec3(0, -stepY, 0);
 			} else {
-				Z += stepZ;
-				if (Z == outZ)
+				pos.z += step.z;
+				if (pos.z == out.z)
 					return false;
-				distance = tmax.z;
 				tmax.z += tdelta.z;
-				normal = glm::vec3(0, 0, -stepZ);
 			}
 		}
 	}
 	return false;
+
+
+	//origin.x = fmod(origin.x, 8.f);
+	//origin.y = fmod(origin.y, 8.f);
+	//origin.z = fmod(origin.z, 8.f);
+
+	//// Initialize
+	//glm::vec3 cb, tmax, tdelta;
+	//int stepX, outX, X = (int)origin.x;
+	//int stepY, outY, Y = (int)origin.y;
+	//int stepZ, outZ, Z = (int)origin.z;
+
+	//glm::ivec3 pos = origin;
+	//glm::ivec3 out;
+	//glm::ivec3 step;
+
+	//out.x = direction.x > 0 ? cell_size : -1;
+	//out.y = direction.y > 0 ? cell_size : -1;
+	//out.z = direction.z > 0 ? cell_size : -1;
+	//step.x = direction.x > 0 ? 1 : -1;
+	//step.y = direction.y > 0 ? 1 : -1;
+	//step.z = direction.z > 0 ? 1 : -1;
+	//cb.x = direction.x > 0 ? pos.x + 1 : pos.x;
+	//cb.y = direction.y > 0 ? pos.y + 1 : pos.y;
+	//cb.z = direction.z > 0 ? pos.z + 1 : pos.z;
+
+	//float rxr, ryr, rzr;
+	//if (direction.x != 0) {
+	//	rxr = 1.0f / direction.x;
+	//	tmax.x = (cb.x - origin.x) * rxr;
+	//	tdelta.x = step.x * rxr;
+	//} else
+	//	tmax.x = 1000000;
+	//if (direction.y != 0) {
+	//	ryr = 1.0f / direction.y;
+	//	tmax.y = (cb.y - origin.y) * ryr;
+	//	tdelta.y = step.y * ryr;
+	//} else
+	//	tmax.y = 1000000;
+	//if (direction.z != 0) {
+	//	rzr = 1.0f / direction.z;
+	//	tmax.z = (cb.z - origin.z) * rzr;
+	//	tdelta.z = step.z * rzr;
+	//} else
+	//	tmax.z = 1000000;
+	//distance = 0.f;
+
+	//// Stepping through grid
+	//while (1) {
+	//	int sub_data = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) / 32;
+	//	int bit = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) % 32;
+
+	//	if (brick->data[sub_data] & (1 << bit)) {
+	//		return true;
+	//	}
+
+	//	int smallest_component = (tmax.x < tmax.y) ? (tmax.x < tmax.z ? 0 : 2) : (tmax.y < tmax.z ? 1 : 2);
+	//	pos[smallest_component] += step[smallest_component];
+	//	if (pos[smallest_component] == out[smallest_component]) {
+	//		return false;
+	//	}
+	//	distance = tmax[smallest_component];
+	//	tmax[smallest_component] += tdelta[smallest_component];
+	//	normal = glm::vec3(0, 0, 0);
+	//	normal[smallest_component] = -step[smallest_component];
+	//
+	//	//distance = glm::min(tmax.x, glm::min(tmax.y, tmax.z));
+	//}
+	//return false;
 }
 
 __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Scene::GPUScene scene) {
@@ -303,13 +343,15 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 	if (!intersect_aabb_branchless2(origin, direction, tminn)) {
 		return false;
 	}
-
+	//return true;
 	// Move ray to hitpoint
 	if (tminn > 0) {
 		origin += direction * tminn;
 
-		constexpr glm::vec3 grid_center(grid_size / 2.f);
-		glm::vec3 to_center = glm::abs(grid_center - origin);
+		constexpr glm::vec3 scale = (glm::vec3(1.f / (grid_size / static_cast<float>(grid_height)), 1.f / (grid_size / static_cast<float>(grid_height)), 1.f / (grid_height / static_cast<float>(grid_height))));
+		constexpr glm::vec3 grid_center = glm::vec3(grid_size / 2.f, grid_size / 2.f, grid_height / 2.f);
+
+		glm::vec3 to_center = glm::abs(grid_center - origin) * scale;
 		glm::vec3 signs = glm::sign(origin - grid_center);
 		to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
 		normal = signs * glm::trunc(to_center + 0.000001f);
@@ -325,7 +367,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 	int stepZ, outZ, Z = ((int)origin.z);
 
 	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
-	if (X < 0 || X >= cells || Y < 0 || Y >= cells || Z < 0 || Z >= cells) {
+	if (X < 0 || X >= cells || Y < 0 || Y >= cells || Z < 0 || Z >= cells_height) {
 		return false;
 	}
 
@@ -349,7 +391,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 	}
 	if (direction.z > 0.0f) {
 		stepZ = 1;
-		outZ = cells;
+		outZ = cells_height;
 		cb.z = (Z + 1);
 	} else {
 		stepZ = -1;
@@ -380,7 +422,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 
 	// Stepping through grid
 	while (1) {
-		Brick* brick = scene.grid[X + Y * cells + Z * cells * cells];
+		Brick* brick = scene.brick_grid[X + Y * cells + Z * cells * cells];
 		if (brick != nullptr) {
 			float sub_distance = 0.f;
 			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, brick)) {
@@ -437,11 +479,12 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 	if (tminn > 0) {
 		origin += direction * tminn;
 
-		constexpr glm::vec3 grid_center(grid_size / 2.f);
-		glm::vec3 to_center = glm::abs(grid_center - origin);
+		constexpr glm::vec3 scale = (glm::vec3(1.f / (grid_size / static_cast<float>(grid_height)), 1.f / (grid_size / static_cast<float>(grid_height)), 1.f / (grid_height / static_cast<float>(grid_height))));
+		constexpr glm::vec3 grid_center = glm::vec3(grid_size / 2.f, grid_size / 2.f, grid_height / 2.f);
+
+		glm::vec3 to_center = glm::abs(grid_center - origin) * scale;
 		glm::vec3 signs = glm::sign(origin - grid_center);
 		to_center /= glm::max(to_center.x, glm::max(to_center.y, to_center.z));
-		//normal = signs * glm::trunc(to_center + 0.000001f);
 
 		origin += -(signs * glm::trunc(to_center + 0.000001f)) * epsilon;
 	}
@@ -454,7 +497,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 	int stepZ, outZ, Z = ((int)origin.z);
 
 	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
-	if (X < 0 || X >= cells || Y < 0 || Y >= cells || Z < 0 || Z >= cells) {
+	if (X < 0 || X >= cells || Y < 0 || Y >= cells || Z < 0 || Z >= cells_height) {
 		return false;
 	}
 
@@ -478,7 +521,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 	}
 	if (direction.z > 0.0f) {
 		stepZ = 1;
-		outZ = cells;
+		outZ = cells_height;
 		cb.z = (Z + 1);
 	} else {
 		stepZ = -1;
@@ -508,7 +551,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 
 	// Stepping through grid
 	while (1) {
-		Brick* brick = scene.grid[X + Y * cells + Z * cells * cells];
+		Brick* brick = scene.brick_grid[X + Y * cells + Z * cells * cells];
 		if (brick != nullptr) {
 			float sub_distance = 0.f;
 			glm::vec3 normal;
@@ -674,7 +717,7 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 }
 
 /// Advance the ray segments once
-__global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed) {
+__global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_extend, 1);
 
@@ -688,7 +731,6 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 
 		if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
 			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
-			//if (yoyo.x <= 0)
 			//atomicAdd(&blit_buffer[ray.pixel_index].r, yoyo.x / 255.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].g, yoyo.y / 255.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].b, yoyo.z / 255.f);
@@ -703,7 +745,7 @@ __global__ void __launch_bounds__(128, 8) extend(RayQueue* ray_buffer, Scene::GP
 
 /// Process collisions and spawn extension and shadow rays.
 /// Rays that continue get placed in ray_buffer_next to be processed next frame
-__global__ void __launch_bounds__(128, 8) shade(RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadowQueue, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int frame) {
+__global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadowQueue, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int frame) {
 
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_shade, 1);

@@ -23,6 +23,7 @@
 #define GLM_FORCE_CXX17
 #include "glm.hpp"
 
+#include "SimplexNoise.h"
 #include "variables.h"
 #include "assert_cuda.h"
 #include "cuda_gl_interop.h"

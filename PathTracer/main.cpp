@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#define PERFORMANCE_TEST
+//#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
 	std::cout << description << "\n";
@@ -203,7 +203,7 @@ int main(int argc, char* argv[]) {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-
+	
 	glfwDestroyWindow(window);
 	glfwTerminate();
 

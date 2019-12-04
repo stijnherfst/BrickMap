@@ -9,9 +9,11 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
-constexpr static int grid_size = 256;
+constexpr static int grid_size = 1024;
+constexpr static int grid_height = 256;
 constexpr static int cell_size = 8;
 constexpr static int cells = grid_size / cell_size;
+constexpr static int cells_height = grid_height / cell_size;
 // The amount of uint32_t members holding voxel bit data
 constexpr static int cell_members = cell_size * cell_size * cell_size / 32;
 
