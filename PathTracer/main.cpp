@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-//#define PERFORMANCE_TEST
+#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
 	std::cout << description << "\n";
@@ -155,14 +155,10 @@ int main(int argc, char* argv[]) {
 		if (done) {
 			break;
 		}
-
 #else
-		//camera.position = glm::vec3{ 182.44f, -57.954f, 129.78f };
-		//camera.horizontal_angle = -1.476f;
-		//camera.vertical_angle = -0.398f;
-
 		camera.handle_input(window, delta);
 #endif
+
 		camera.update();
 
 		launch_kernels(interop.ca, blit_buffer, scene.gpuScene, ray_buffer_work, ray_buffer_next, shadow_queue_buffer);

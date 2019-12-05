@@ -1,718 +1,132 @@
 
 
-Average ms: 11.3028
-Average fps: 88.4735
-Min ms: 2e-07
-Max ms: 0.0388288
-
-Average ms: 10.3888
-Average fps: 96.2576
-Min ms: 0.009159
-Max ms: 0.0387655
-
-Average ms: 10.8792
-Average fps: 91.9183
-Min ms: 0.0095601
-Max ms: 0.0274774
-
-Average ms: 12.3927
-Average fps: 80.6924
-Min ms: 0.0105285
-Max ms: 0.0369886
-
-Average ms: 9.98033
-Average fps: 100.197
-Min ms: 0.0086008
-Max ms: 0.0123142
-
-Average ms: 10.5146
-Average fps: 95.1057
-Min ms: 0.0094334
-Max ms: 0.0118871
-
-
-
-
-Average ms: 11.0678
-Average fps: 90.3518
-Min ms: 4e-07
-Max ms: 0.0380383
-
-Average ms: 9.96332
-Average fps: 100.368
-Min ms: 0.0089821
-Max ms: 0.0403335
-
-Average ms: 10.6369
-Average fps: 94.0122
-Min ms: 0.0099702
-Max ms: 0.0381396
-
-Average ms: 12.3045
-Average fps: 81.2708
-Min ms: 0.0103685
-Max ms: 0.0131955
-
-Average ms: 9.93303
-Average fps: 100.674
-Min ms: 0.0085357
-Max ms: 0.0123886
-
-Average ms: 10.4536
-Average fps: 95.6606
-Min ms: 0.0094573
-Max ms: 0.0127916
-
-
-Average ms: 18.1948
-Average fps: 54.9608
-Min ms: 3e-07
-Max ms: 0.042216
-
-Average ms: 13.8169
-Average fps: 72.3752
-Min ms: 0.0106189
-Max ms: 0.0379751
-
-Average ms: 17.1078
-Average fps: 58.453
-Min ms: 0.0141556
-Max ms: 0.0401967
-
-Average ms: 20.5543
-Average fps: 48.6517
-Min ms: 0.0165215
-Max ms: 0.0223859
-
-Average ms: 13.3367
-Average fps: 74.9812
-Min ms: 0.0115284
-Max ms: 0.0208916
-
-Average ms: 15.8787
-Average fps: 62.9773
-Min ms: 0.0122565
-Max ms: 0.0170472
-
-
-Average ms: 10.4061
-Average fps: 96.0977
-Min ms: 3e-07
-Max ms: 0.0485868
-
-Average ms: 9.43427
-Average fps: 105.997
-Min ms: 0.0087668
-Max ms: 0.0304328
-
-Average ms: 10.0564
-Average fps: 99.4389
-Min ms: 0.0090779
-Max ms: 0.0452921
-
-Average ms: 11.6377
-Average fps: 85.9276
-Min ms: 0.0101899
-Max ms: 0.0124525
-
-Average ms: 9.4876
-Average fps: 105.401
-Min ms: 0.0081706
-Max ms: 0.0116319
-
-Average ms: 9.94059
-Average fps: 100.598
-Min ms: 0.0082437
-Max ms: 0.012765
-
-
-Average ms: 10.3778
-Average fps: 96.3594
-Min ms: 3e-07
-Max ms: 0.0427235
-
-Average ms: 9.4626
-Average fps: 105.679
-Min ms: 0.0086472
-Max ms: 0.0386203
-
-Average ms: 10.0347
-Average fps: 99.6543
-Min ms: 0.0093508
-Max ms: 0.0399946
-
-Average ms: 11.6034
-Average fps: 86.182
-Min ms: 0.010146
-Max ms: 0.0144459
-
-Average ms: 9.48631
-Average fps: 105.415
-Min ms: 0.0080313
-Max ms: 0.0126528
-
-Average ms: 9.90774
-Average fps: 100.931
-Min ms: 0.0092548
-Max ms: 0.0129482
-
-
-Average ms: 10.3313
-Average fps: 96.7935
-Min ms: 3e-07
-Max ms: 0.0451523
-
-Average ms: 9.41548
-Average fps: 106.208
-Min ms: 0.0085447
-Max ms: 0.0355232
-
-Average ms: 10.0236
-Average fps: 99.7647
-Min ms: 0.0092255
-Max ms: 0.0388389
-
-Average ms: 11.6288
-Average fps: 85.9934
-Min ms: 0.0094385
-Max ms: 0.0125057
-
-Average ms: 9.52604
-Average fps: 104.975
-Min ms: 0.0081591
-Max ms: 0.0121091
-
-Average ms: 9.95089
-Average fps: 100.494
-Min ms: 0.0092546
-Max ms: 0.0111279
-
-
-Average ms: 10.4079
-Average fps: 96.0806
-Min ms: 3e-07
-Max ms: 0.0569572
-
-Average ms: 9.46853
-Average fps: 105.613
-Min ms: 0.0088104
-Max ms: 0.0403735
-
-Average ms: 10.0415
-Average fps: 99.5867
-Min ms: 0.0090081
-Max ms: 0.0432771
-
-Average ms: 11.6435
-Average fps: 85.8851
-Min ms: 0.0103555
-Max ms: 0.0124084
-
-Average ms: 9.45982
-Average fps: 105.71
-Min ms: 0.0079905
-Max ms: 0.011825
-
-Average ms: 9.9463
-Average fps: 100.54
-Min ms: 0.0092427
-Max ms: 0.010835
-
-
-Average ms: 97.5557
-Average fps: 10.2506
-Min ms: 3e-07
-Max ms: 0.106158
-
-Average ms: 97.4194
-Average fps: 10.2649
-Min ms: 0.0926408
-Max ms: 0.104767
-
-Average ms: 97.5218
-Average fps: 10.2541
-Min ms: 0.0932695
-Max ms: 0.105148
-
-Average ms: 99.929
-Average fps: 10.0071
-Min ms: 0.0952615
-Max ms: 0.106474
-
-Average ms: 97.4924
-Average fps: 10.2572
-Min ms: 0.0912689
-Max ms: 0.10699
-
-Average ms: 96.3108
-Average fps: 10.3831
-Min ms: 0.0919674
-Max ms: 0.10581
-
-
-Average ms: 11.5584
-Average fps: 86.517
-Min ms: 3e-07
-Max ms: 0.0386881
-
-Average ms: 17.9014
-Average fps: 55.8617
-Min ms: 0.0094855
-Max ms: 6.1325
-
-Average ms: 10.8792
-Average fps: 91.9189
-Min ms: 0.0101659
-Max ms: 0.0387588
-
-Average ms: 12.4965
-Average fps: 80.0227
-Min ms: 0.0109181
-Max ms: 0.0130216
-
-Average ms: 10.4012
-Average fps: 96.1427
-Min ms: 0.0092273
-Max ms: 0.0125352
-
-Average ms: 10.786
-Average fps: 92.7126
-Min ms: 0.0095571
-Max ms: 0.0113071
-
-
-
-
-
-
-
-
-Average ms: 10.3826
-Average fps: 96.3153
-Min ms: 2e-07
-Max ms: 0.0514411
-
-Average ms: 9.44198
-Average fps: 105.91
-Min ms: 0.008536
-Max ms: 0.0105923
-
-Average ms: 10.0335
-Average fps: 99.6661
-Min ms: 0.0090282
-Max ms: 0.0389218
-
-Average ms: 11.6396
-Average fps: 85.9135
-Min ms: 0.0094725
-Max ms: 0.0123922
-
-Average ms: 9.46865
-Average fps: 105.612
-Min ms: 0.0080967
-Max ms: 0.0117843
-
-Average ms: 9.94153
-Average fps: 100.588
-Min ms: 0.0092732
-Max ms: 0.0107806
-
-
-Average ms: 98.0497
-Average fps: 10.1989
-Min ms: 2e-07
-Max ms: 0.115315
-
-Average ms: 99.7578
-Average fps: 10.0243
-Min ms: 0.0940161
-Max ms: 0.107128
-
-Average ms: 99.4256
-Average fps: 10.0578
-Min ms: 0.0953328
-Max ms: 0.108105
-
-Average ms: 100.103
-Average fps: 9.98969
-Min ms: 0.0970529
-Max ms: 0.105965
-
-Average ms: 99.6655
-Average fps: 10.0336
-Min ms: 0.0943091
-Max ms: 0.109207
-
-Average ms: 97.5695
-Average fps: 10.2491
-Min ms: 0.0930669
-Max ms: 0.10608
-
-
-Average ms: 98.1629
-Average fps: 10.1871
-Min ms: 4e-07
-Max ms: 0.110629
-
-Average ms: 97.2683
-Average fps: 10.2808
-Min ms: 0.0923305
-Max ms: 0.105001
-
-Average ms: 97.4299
-Average fps: 10.2638
-Min ms: 0.0920808
-Max ms: 0.105226
-
-Average ms: 99.4442
-Average fps: 10.0559
-Min ms: 0.095065
-Max ms: 0.10386
-
-Average ms: 97.0359
-Average fps: 10.3055
-Min ms: 0.090594
-Max ms: 0.108959
-
-Average ms: 97.8055
-Average fps: 10.2244
-Min ms: 0.0925309
-Max ms: 0.105481
-
-
-Average ms: 3968.4
-Average fps: 0.251991
-Min ms: 2e-07
-Max ms: 6.22136
-
-Average ms: 5730.45
-Average fps: 0.174506
-Min ms: 5.66831
-Max ms: 5.7926
-
-Average ms: 5676.99
-Average fps: 0.17615
-Min ms: 5.58518
-Max ms: 5.7688
-
-Average ms: 5763.21
-Average fps: 0.173514
-Min ms: 5.67784
-Max ms: 5.84858
-
-Average ms: 5660.91
-Average fps: 0.17665
-Min ms: 5.61434
-Max ms: 5.70748
-
-Average ms: 5774.2
-Average fps: 0.173184
-Min ms: 5.68449
-Max ms: 5.86391
-
-
-Average ms: 3966.34
-Average fps: 0.252121
-Min ms: 2e-07
-Max ms: 6.10368
-
-Average ms: 5603.92
-Average fps: 0.178447
-Min ms: 5.59946
-Max ms: 5.60838
-
-Average ms: 5667.37
-Average fps: 0.176449
-Min ms: 5.65162
-Max ms: 5.68311
-
-Average ms: 5651.96
-Average fps: 0.17693
-Min ms: 5.63101
-Max ms: 5.67291
-
-Average ms: 5664.76
-Average fps: 0.17653
-Min ms: 5.59114
-Max ms: 5.73839
-
-Average ms: 5681.13
-Average fps: 0.176021
-Min ms: 5.57573
-Max ms: 5.78653
-
-
-Average ms: 11.5392
-Average fps: 86.6613
-Min ms: 2e-07
-Max ms: 0.0374977
-
-Average ms: 10.6742
-Average fps: 93.6841
-Min ms: 0.0100281
-Max ms: 0.0117702
-
-Average ms: 28.5005
-Average fps: 35.0871
-Min ms: 0.0104475
-Max ms: 6.1452
-
-Average ms: 12.4234
-Average fps: 80.493
-Min ms: 0.0107919
-Max ms: 0.0129569
-
-Average ms: 10.3881
-Average fps: 96.2643
-Min ms: 0.0090885
-Max ms: 0.0123207
-
-Average ms: 10.7921
-Average fps: 92.6605
-Min ms: 0.0099033
-Max ms: 0.0112928
-
-
-
-
-Average ms: 11.7026
-Average fps: 85.451
-Min ms: 3e-07
-Max ms: 0.0558052
-
-Average ms: 10.7824
-Average fps: 92.7435
-Min ms: 0.0100748
-Max ms: 0.0125343
-
-Average ms: 30.3207
-Average fps: 32.9808
-Min ms: 0.0102322
-Max ms: 6.26382
-
-Average ms: 12.904
-Average fps: 77.4952
-Min ms: 0.011075
-Max ms: 0.0145871
-
-Average ms: 10.8698
-Average fps: 91.9984
-Min ms: 0.0095446
-Max ms: 0.0128826
-
-Average ms: 11.2965
-Average fps: 88.5232
-Min ms: 0.010434
-Max ms: 0.0126943
-
-
-Average ms: 11.2957
-Average fps: 88.529
-Min ms: 3e-07
-Max ms: 0.0400558
-
-Average ms: 17.971
-Average fps: 55.6452
-Min ms: 0.0098118
-Max ms: 5.56237
-
-Average ms: 10.7457
-Average fps: 93.0601
-Min ms: 0.0102556
-Max ms: 0.0540045
-
-Average ms: 12.2424
-Average fps: 81.6835
-Min ms: 0.0105747
-Max ms: 0.0127894
-
-Average ms: 10.2131
-Average fps: 97.9135
-Min ms: 0.008858
-Max ms: 0.012207
-
-Average ms: 10.6218
-Average fps: 94.1457
-Min ms: 0.0098505
-Max ms: 0.0114826
-
-
-Average ms: 10.1727
-Average fps: 98.3022
-Min ms: 4e-07
-Max ms: 0.0379762
-
-Average ms: 9.43661
-Average fps: 105.97
-Min ms: 0.0087119
-Max ms: 0.0645652
-
-Average ms: 10.0703
-Average fps: 99.3024
-Min ms: 0.0093448
-Max ms: 0.0371232
-
-Average ms: 11.6775
-Average fps: 85.6344
-Min ms: 0.0097324
-Max ms: 0.0125788
-
-Average ms: 9.56538
-Average fps: 104.544
-Min ms: 0.0081816
-Max ms: 0.0114338
-
-Average ms: 10.017
-Average fps: 99.8301
-Min ms: 0.0087267
-Max ms: 0.0109013
-
-
-Average ms: 10.4471
-Average fps: 95.7207
-Min ms: 2e-07
-Max ms: 0.0554437
-
-Average ms: 9.56216
-Average fps: 104.579
-Min ms: 0.0087754
-Max ms: 0.0700187
-
-Average ms: 9.93543
-Average fps: 100.65
-Min ms: 0.0093134
-Max ms: 0.0408811
-
-Average ms: 11.5189
-Average fps: 86.8138
-Min ms: 0.0102706
-Max ms: 0.0136106
-
-Average ms: 9.40109
-Average fps: 106.371
-Min ms: 0.0077218
-Max ms: 0.0118059
-
-Average ms: 9.83944
-Average fps: 101.632
-Min ms: 0.0089782
-Max ms: 0.0123141
-
-
-Average ms: 10.4824
-Average fps: 95.398
-Min ms: 2e-07
-Max ms: 0.0359668
-
-Average ms: 10.2168
-Average fps: 97.8779
-Min ms: 0.0089753
-Max ms: 0.638785
-
-Average ms: 9.79124
-Average fps: 102.132
-Min ms: 0.0091784
-Max ms: 0.0357141
-
-Average ms: 11.6228
-Average fps: 86.0375
-Min ms: 0.0098931
-Max ms: 0.0120471
-
-Average ms: 9.51977
-Average fps: 105.045
-Min ms: 0.0082503
-Max ms: 0.0114409
-
-Average ms: 9.96943
-Average fps: 100.307
-Min ms: 0.0096669
-Max ms: 0.0106674
-
-
-Average ms: 11.4169
-Average fps: 87.5896
-Min ms: 3e-07
-Max ms: 0.0372442
-
-Average ms: 10.5056
-Average fps: 95.1876
-Min ms: 0.0098829
-Max ms: 0.0384698
-
-Average ms: 25.5875
-Average fps: 39.0815
-Min ms: 0.0102306
-Max ms: 5.74299
-
-Average ms: 12.4774
-Average fps: 80.145
-Min ms: 0.0111544
-Max ms: 0.0134871
-
-Average ms: 10.1886
-Average fps: 98.1487
-Min ms: 0.0090485
-Max ms: 0.012471
-
-Average ms: 10.6424
-Average fps: 93.9642
-Min ms: 0.0099416
-Max ms: 0.0111794
-
-
-
-
-Average ms: 12.9918
-Average fps: 76.9719
-Min ms: 3e-07
-Max ms: 0.814877
-
-Average ms: 11.1113
-Average fps: 89.9988
-Min ms: 0.0087827
-Max ms: 0.0396121
-
-Average ms: 11.5831
-Average fps: 86.3325
-Min ms: 0.0094074
-Max ms: 0.0394702
-
-Average ms: 13.1674
-Average fps: 75.9454
-Min ms: 0.0098132
-Max ms: 0.0149431
-
-
-
-Average ms: 11.9818
-Average fps: 83.46
-Min ms: 3e-07
-Max ms: 0.0392094
-
-Average ms: 11.0302
-Average fps: 90.6598
-Min ms: 0.0086183
-Max ms: 0.0374043
-
-Average ms: 11.5825
-Average fps: 86.3375
-Min ms: 0.0094625
-Max ms: 0.039525
-
-Average ms: 13.3345
-Average fps: 74.9935
-Min ms: 0.0111685
-Max ms: 0.0145475
-
-Average ms: 11.0828
-Average fps: 90.2303
-Min ms: 0.0081318
-Max ms: 0.0134867
-
-Average ms: 11.4686
-Average fps: 87.1949
-Min ms: 0.0093481
-Max ms: 0.0129762
-
-
+Average ms: 66.8245
+Average fps: 14.9646
+Min ms: 0.0003
+Max ms: 78.947
+
+Average ms: 71.5716
+Average fps: 13.972
+Min ms: 56.2411
+Max ms: 78.9025
+
+Average ms: 48.8206
+Average fps: 20.4832
+Min ms: 42.4094
+Max ms: 77.4631
+
+Average ms: 80.9966
+Average fps: 12.3462
+Min ms: 50.281
+Max ms: 86.7961
+
+Average ms: 58.7679
+Average fps: 17.0161
+Min ms: 39.9611
+Max ms: 79.5809
+
+
+Average ms: 67.8736
+Average fps: 14.7333
+Min ms: 0.0003
+Max ms: 81.0258
+
+Average ms: 72.6566
+Average fps: 13.7634
+Min ms: 56.1983
+Max ms: 83.6934
+
+Average ms: 49.6337
+Average fps: 20.1476
+Min ms: 42.5554
+Max ms: 70.77
+
+Average ms: 82.4971
+Average fps: 12.1216
+Min ms: 56.7414
+Max ms: 86.1445
+
+Average ms: 59.7821
+Average fps: 16.7274
+Min ms: 40.4867
+Max ms: 83.9262
+
+
+
+
+Average ms: 51.5529
+Average fps: 19.3975
+Min ms: 0.0004
+Max ms: 65.1928
+
+Average ms: 60.5528
+Average fps: 16.5145
+Min ms: 23.5681
+Max ms: 68.1283
+
+Average ms: 34.2749
+Average fps: 29.1759
+Min ms: 12.5675
+Max ms: 60.024
+
+Average ms: 61.8441
+Average fps: 16.1697
+Min ms: 23.4133
+Max ms: 72.1479
+
+Average ms: 49.9343
+Average fps: 20.0263
+Min ms: 25.0373
+Max ms: 62
+
+
+Average ms: 53.6968
+Average fps: 18.6231
+Min ms: 0.0003
+Max ms: 67.8756
+
+Average ms: 63.0656
+Average fps: 15.8565
+Min ms: 26.0386
+Max ms: 70.449
+
+Average ms: 36.5324
+Average fps: 27.3729
+Min ms: 13.9619
+Max ms: 65.0383
+
+Average ms: 65.8197
+Average fps: 15.193
+Min ms: 27.5398
+Max ms: 78.9994
+
+Average ms: 52.7077
+Average fps: 18.9726
+Min ms: 26.4969
+Max ms: 65.6592
+
+
+Average ms: 52.2531
+Average fps: 19.1376
+Min ms: 0.0008
+Max ms: 64.9869
+
+Average ms: 60.006
+Average fps: 16.665
+Min ms: 24.7602
+Max ms: 67.3105
+
+Average ms: 33.9396
+Average fps: 29.4641
+Min ms: 13.3609
+Max ms: 60.5529
+
+Average ms: 60.9139
+Average fps: 16.4166
+Min ms: 23.6767
+Max ms: 75.3208
+
+Average ms: 49.1417
+Average fps: 20.3493
+Min ms: 23.9523
+Max ms: 56.9024

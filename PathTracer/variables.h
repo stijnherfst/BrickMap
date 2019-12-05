@@ -9,8 +9,8 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
-constexpr static int grid_size = 8192;
-constexpr static int grid_height = 256;
+constexpr static int grid_size = 2048;
+constexpr static int grid_height = 2048;
 constexpr static int cell_size = 8;
 constexpr static int cells = grid_size / cell_size;
 constexpr static int cells_height = grid_height / cell_size;
@@ -23,10 +23,6 @@ extern glm::vec2 sun_position;
 extern bool sun_position_changed;
 extern int sm_cores;
 
-enum class GeometryType {
-	Sphere = 0, Triangle = 1
-};
-
 struct RayQueue {
 	glm::vec3 origin;
 	glm::vec3 direction;
@@ -36,8 +32,6 @@ struct RayQueue {
 	int identifier;
 	int bounces;
 	unsigned int pixel_index;
-	//GeometryType geometry_type = GeometryType::Triangle;
-	//bool lastSpecular = true;
 };
 
 struct ShadowQueue {

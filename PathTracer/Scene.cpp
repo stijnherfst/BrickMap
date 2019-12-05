@@ -8,49 +8,22 @@ void Scene::generate() {
 
 	auto begin = std::chrono::steady_clock::now();
 
-	//std::for_each(std::execution::par_unseq)
-	//for (int y = 0; y < grid_size; y++) {
-	//	for (int x = 0; x < grid_size; x++) {
-	//		float height = SimplexNoise::noise(x / 256.f, y / 256.f) * (grid_height / 2.f) + (grid_height / 2.f);
-
-	//		for (int z = 0; z < height; z++) {
-	//			uint32_t sub_x = x / cell_size;
-	//			uint32_t sub_y = (y / cell_size) * cells;
-	//			uint32_t sub_z = (z / cell_size) * cells * cells;
-
-	//			uint32_t cell_x = x % cell_size;
-	//			uint32_t cell_y = (y % cell_size) * cell_size;
-	//			uint32_t cell_z = (z % cell_size) * cell_size * cell_size;
-
-	//			uint32_t sub_data = (cell_x + cell_y + cell_z) / (sizeof(uint32_t) * 8);
-	//			uint32_t bit_position = (cell_x + cell_y + cell_z) % (sizeof(uint32_t) * 8);
-
-	//			scene[sub_x + sub_y + sub_z].data[sub_data] |= (1 << bit_position);
-	//		}
-	//	}
-	//}
-
-	//std::for_each(std::execution::par_unseq, )
-
 	auto func = [&](int start, int end) {
+		//FastNoiseSIMD* noise = FastNoiseSIMD::NewFastNoiseSIMD();
+
+		//float* noiseSet = noise->GetSimplexSet(0, start * cell_size, 0, cells * cell_size, (end - start) * cell_size, 1);  
+		SimplexNoise noise(1.f, 1.f, 2.f, 0.5f);
+		
 		for (int y = start; y < end; y++) {
 			for (int x = 0; x < cells; x++) {
 				for (int cell_x = 0; cell_x < cell_size; cell_x++) {
 					for (int cell_y = 0; cell_y < cell_size; cell_y++) {
-						float height = SimplexNoise::noise((x * cell_size + cell_x) / 256.f, (y * cell_size + cell_y) / 256.f) * (grid_height / 2.f) + (grid_height / 2.f);
+						//float height = SimplexNoise::noise((x * cell_size + cell_x) / 256.f, (y * cell_size + cell_y) / 256.f); // * (grid_height / 2.f) + (grid_height / 2.f);
+						//float height = noiseSet[x * cell_size + cell_x + ((y - start) * cell_size + cell_y) * ((end - start) * cell_size)]; //*(grid_height / 2.f) + (grid_height / 2.f);
+						float height = noise.fractal(7, (x * cell_size + cell_x) / 1024.f, (y * cell_size + cell_y) / 1024.f) * (grid_height / 2.f) + (grid_height / 2.f);
 
 						for (int z = 0; z < height; z++) {
-							/*uint32_t sub_x = x / cell_size;
-						uint32_t sub_y = (y / cell_size) * cells;
-						uint32_t sub_z = (z / cell_size) * cells * cells;*/
-
-							/*uint32_t cell_x = x % cell_size;
-						uint32_t cell_y = (y % cell_size) * cell_size;
-						uint32_t cell_z = (z % cell_size) * cell_size * cell_size;*/
-
 							uint32_t sub_data = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) / (sizeof(uint32_t) * 8);
-
-							//uint32_t sub_data = / (sizeof(uint32_t) * 8);
 							uint32_t bit_position = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) % (sizeof(uint32_t) * 8);
 
 							scene[x + y * cells + (z / cell_size) * cells * cells].data[sub_data] |= (1 << bit_position);
@@ -59,52 +32,19 @@ void Scene::generate() {
 				}
 			}
 		}
+	//	FastNoiseSIMD::FreeNoiseSet(noiseSet);
 	};
+
 
 	constexpr int thread_count = 16;
 	std::thread threads[thread_count];
 	for (int i = 0; i < thread_count; i++) {
-		threads[i] = std::thread(func, (1024 / thread_count) * i, (1024 / thread_count) * (i + 1));
+		threads[i] = std::thread(func, (cells / thread_count) * i, (cells / thread_count) * (i + 1));
 	}
 
 	for (int i = 0; i < thread_count; i++) {
 		threads[i].join();
 	}
-		//std::thread thread1(func, 0, 512);
-	//std::thread thread2(func, 513, 1024);
-	//thread1.join();
-	//thread2.join();
-	
-	//std::thread thread2;
-
-	//for (int y = 0; y < cells; y++) {
-	//	for (int x = 0; x < cells; x++) {
-	//		for (int cell_x = 0; cell_x < cell_size; cell_x++) {
-	//			for (int cell_y = 0; cell_y < cell_size; cell_y++) {
-	//				float height = SimplexNoise::noise((x * cell_size + cell_x) / 256.f, (y * cell_size + cell_y) / 256.f) * (grid_height / 2.f) + (grid_height / 2.f);
-
-	//				for (int z = 0; z < height; z++) {
-	//					/*uint32_t sub_x = x / cell_size;
-	//					uint32_t sub_y = (y / cell_size) * cells;
-	//					uint32_t sub_z = (z / cell_size) * cells * cells;*/
-
-	//					/*uint32_t cell_x = x % cell_size;
-	//					uint32_t cell_y = (y % cell_size) * cell_size;
-	//					uint32_t cell_z = (z % cell_size) * cell_size * cell_size;*/
-
-	//					uint32_t sub_data = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) / (sizeof(uint32_t) * 8);
-
-
-
-	//					//uint32_t sub_data = / (sizeof(uint32_t) * 8);
-	//					uint32_t bit_position = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) % (sizeof(uint32_t) * 8);
-
-	//					scene[x + y * cells + (z / cell_size) * cells * cells].data[sub_data] |= (1 << bit_position);
-	//				}
-	//			}
-	//		}
-	//	}
-	//}
 
 	std::cout << "Generation took " << (std::chrono::steady_clock::now() - begin).count() / 1'000'000 << "ms\n";
 	begin = std::chrono::steady_clock::now();

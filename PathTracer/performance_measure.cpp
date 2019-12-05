@@ -31,8 +31,8 @@ bool PerformanceMeasure::measure(double delta) {
 		double average_delta = std::accumulate(times.begin(), times.end(), 0.f) / times.size();
 		file << "Average ms: " << average_delta * 1000.0 << "\n";
 		file << "Average fps: " << 1.0 / average_delta << "\n";
-		file << "Min ms: " << delta_min << "\n";
-		file << "Max ms: " << delta_max << "\n";
+		file << "Min ms: " << delta_min * 1000.0 << "\n";
+		file << "Max ms: " << delta_max * 1000.0 << "\n";
 
 		delta_min = std::numeric_limits<double>::max();
 		delta_max = 0;
@@ -45,5 +45,6 @@ bool PerformanceMeasure::measure(double delta) {
 			return true;
 		}
 	}
+	
 	return false;
 }

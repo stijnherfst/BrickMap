@@ -28,6 +28,11 @@ void Camera::handle_input(GLFWwindow* window, double delta) {
 		return;
 	}
 
+	if (glfwGetKey(window, GLFW_KEY_F5)) {
+		std::cout << position.x << ", " << position.y << ", " << position.z << "\n"
+				  << horizontal_angle << ", " << vertical_angle << "\n";
+	}
+
 	double x, y;
 	glfwGetCursorPos(window, &x, &y);
 	int w, h;

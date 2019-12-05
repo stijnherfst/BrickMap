@@ -16,6 +16,12 @@
     <Filter Include="Source Files\IMGUI">
       <UniqueIdentifier>{9f5a3ccd-8dbc-49b7-b8c5-346b2fcd6f39}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\FastNoise">
+      <UniqueIdentifier>{158401d1-6d7b-4653-8137-b2552f293e80}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\FastNoise">
+      <UniqueIdentifier>{f631d839-4a95-46bd-85fc-f26e40c28535}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="kernel.cu">
@@ -83,6 +89,12 @@
     <ClInclude Include="SimplexNoise.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="FastNoiseSIMD\FastNoiseSIMD.h">
+      <Filter>Header Files\FastNoise</Filter>
+    </ClInclude>
+    <ClInclude Include="FastNoiseSIMD\FastNoiseSIMD_internal.h">
+      <Filter>Header Files\FastNoise</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="assert_cuda.cpp">
@@ -135,6 +147,27 @@
     </ClCompile>
     <ClCompile Include="SimplexNoise.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
+      <Filter>Source Files\FastNoise</Filter>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
+      <Filter>Source Files\FastNoise</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
