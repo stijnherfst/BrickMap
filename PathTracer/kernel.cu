@@ -12,6 +12,13 @@ constexpr int NUM_SPHERES = 7;
 constexpr float VERY_FAR = 1e20f;
 constexpr int MAX_BOUNCES = 3;
 
+// Whats the upper bound of x before this doesnt work?
+__device__ __forceinline unsigned int morton(unsigned int x) {
+	x = (x ^ (x << 16)) & 0xff0000ff, x = (x ^ (x << 8)) & 0x0300f00f;
+	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
+	return x;
+}
+
 surface<void, cudaSurfaceType2D> surf;
 texture<float, cudaTextureTypeCubemap> skybox;
 
@@ -105,7 +112,7 @@ enum Refl_t { DIFF,
 			  PHONG,
 			  LIGHT };
 
-__device__ inline bool intersect_brick(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Brick* brick) {
+__device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, Brick* brick) {
 	origin = glm::mod(origin, 8.f);
 	glm::ivec3 pos = origin;
 	glm::ivec3 out;
@@ -190,7 +197,7 @@ __device__ inline bool intersect_brick(glm::vec3 origin, const glm::vec3& direct
 }
 
 
-__device__ inline bool intersect_brick_simple(glm::vec3 origin, const glm::vec3& direction, Brick* brick) {
+__device__ inline bool intersect_brick_simple(glm::vec3 origin, glm::vec3 direction, Brick* brick) {
 	origin = glm::mod(origin, 8.f);
 	glm::ivec3 pos = origin;
 	glm::ivec3 out;
@@ -231,7 +238,6 @@ __device__ inline bool intersect_brick_simple(glm::vec3 origin, const glm::vec3&
 	while (1) {
 		int sub_data = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) / 32;
 		int bit = (pos.x + pos.y * cell_size + pos.z * cell_size * cell_size) % 32;
-
 		if (brick->data[sub_data] & (1 << bit)) {
 			return true;
 		}
@@ -265,13 +271,12 @@ __device__ inline bool intersect_brick_simple(glm::vec3 origin, const glm::vec3&
 	return false;
 }
 
-__device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direction, glm::vec3& normal, float& distance, Scene::GPUScene scene) {
-	// Check if ray hits grid AABB
+__device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, Scene::GPUScene scene) {
 	float tminn;
 	if (!intersect_aabb_branchless2(origin, direction, tminn)) {
 		return false;
 	}
-	//return true;
+
 	// Move ray to hitpoint
 	if (tminn > 0) {
 		origin += direction * tminn;
@@ -332,13 +337,15 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 	int smallest_component = -1;
 	// Stepping through grid
 	while (1) {
-		uint32_t index = scene.brick_grid[pos.x + pos.y * cells + pos.z * cells * cells];
+		uint32_t index = scene.brick_grid[morton(pos.x) + (morton(pos.y) << 1) + (morton(pos.z) << 2)];
 		if (index != UINT_MAX) {
 			float sub_distance = 0.f;
+
 			if (smallest_component > -1) {
 				normal = glm::vec3(0, 0, 0);
 				normal[smallest_component] = -step[smallest_component];
 			}
+
 			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &scene.bricks[index])) {
 				distance = new_distance * 8.f + sub_distance + glm::max(tminn, 0.f) + epsilon;
 				return true;
@@ -380,7 +387,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3& direct
 	return false;
 }
 
-__device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3& direction, Scene::GPUScene scene) {
+__device__ inline bool intersect_voxel_simple(glm::vec3 origin, glm::vec3 direction, Scene::GPUScene scene) {
 	// Check if ray hits grid AABB
 	float tminn;
 	if (!intersect_aabb_branchless2(origin, direction, tminn)) {
@@ -463,8 +470,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, const glm::vec3&
 
 	// Stepping through grid
 	while (1) {
-
-		uint32_t index = scene.brick_grid[X + Y * cells + Z * cells * cells];
+		uint32_t index = scene.brick_grid[morton(X) + (morton(Y) << 1) + (morton(Z) << 2)];
 		if (index != UINT_MAX) {
 			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &scene.bricks[index])) {
 				return true;
@@ -612,8 +618,6 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 		directionToFocalPlane = glm::normalize(directionToFocalPlane);
 
 		//Get the convergence point which is at focalDistance)
-		//TODO(Dan): I currently multiply by 3 because I felt it would be easier for the ImGui slider.
-		// Fix this by modifying how slider works?
 		const int ImGui_slider_hack = 3.0f;
 		glm::vec3 convergencePoint = O + focalDistance * ImGui_slider_hack * directionToFocalPlane;
 
@@ -638,19 +642,21 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 		RayQueue& ray = ray_buffer[index];
 
 		ray.distance = VERY_FAR;
-		//intersect_voxel(ray, sceneData, ray.normal, {32, 32, 32});
+		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData);
 
-		if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
+		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
 			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
-			/*atomicAdd(&blit_buffer[ray.pixel_index].r, yoyo.x / 255.f);
-			atomicAdd(&blit_buffer[ray.pixel_index].g, yoyo.y / 255.f);
-			atomicAdd(&blit_buffer[ray.pixel_index].b, yoyo.z / 255.f);*/
-			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 20.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 20.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 20.f);
+
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
+
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
+
 			//atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
-			//printf("x:%f y:%f z:%f\n", ray.normal.x, ray.normal.y, ray.normal.z);
-		}
+		//}
 	}
 }
 
@@ -666,7 +672,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 		}
 
 		int new_frame = 0;
-		RayQueue& ray = ray_buffer[index];
+		RayQueue ray = ray_buffer[index];
 
 		//Each iteration we add color to the blit_buffer.
 		//Color can be non-zero if sun/sky or we're counting emisivity for different objects.
@@ -746,7 +752,7 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 			return;
 		}
 
-		ShadowQueue& ray = queue[index];
+		ShadowQueue ray = queue[index];
 
 		if (!intersect_voxel_simple(ray.origin, ray.direction, sceneData)) {
 			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.color.r);
