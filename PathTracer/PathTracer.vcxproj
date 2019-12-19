@@ -68,6 +68,8 @@
       <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\assimp-4.1.0\include;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <AdditionalOptions>/std:c++latest</AdditionalOptions>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -91,7 +93,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\assimp-4.1.0\include;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/std:c++latest</AdditionalOptions>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
@@ -100,8 +102,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glfw3.lib;assimp-vc140-mt.lib;zlibstatic.lib;IrrXML.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Release;Dependencies\assimp-4.1.0\release;Dependencies\zlib-1.2.11\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -121,6 +123,7 @@
       <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\assimp-4.1.0\include;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/std:c++latest</AdditionalOptions>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -143,23 +146,35 @@
       <FastMath Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</FastMath>
     </CudaCompile>
     <CudaCompile Include="sunsky.cu" />
+    <CudaCompile Include="voxel.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="assert_cuda.cpp" />
-    <ClCompile Include="Bbox.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="camera.cpp" />
     <ClCompile Include="Dependencies\glad-0.1.24\src\glad.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx2.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx512.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_internal.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_neon.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse2.cpp" />
-    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse41.cpp" />
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx2.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_avx512.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_internal.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_neon.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse2.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="FastNoiseSIMD\FastNoiseSIMD_sse41.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="IMGUI\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -188,7 +203,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="assert_cuda.h" />
-    <ClInclude Include="Bbox.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="cuda_definitions.h" />
     <ClInclude Include="FastNoiseSIMD\FastNoiseSIMD.h" />
@@ -208,6 +222,7 @@
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="sunsky.cuh" />
     <ClInclude Include="variables.h" />
+    <ClInclude Include="voxel.cuh" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

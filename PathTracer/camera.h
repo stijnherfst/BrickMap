@@ -1,7 +1,7 @@
 #pragma once
 
 struct Camera {
-	glm::vec3 position = { 280, 130, 130 };
+	glm::vec3 position = { 512, 512, 1200 };
 	glm::vec3 direction = { 1, 0, 0 };
 	glm::vec3 up = { 0, 0, 1 };
 

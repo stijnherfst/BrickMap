@@ -30,7 +30,6 @@
 #include "cuda_gl_interop.h"
 #include "performance_measure.h"
 
-#include "Bbox.h"
 #include "Scene.h"
 
 #include "camera.h"

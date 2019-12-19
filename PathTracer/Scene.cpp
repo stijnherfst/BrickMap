@@ -9,91 +9,103 @@ __forceinline unsigned int morton(unsigned int x) {
 	return x;
 }
 
-void Scene::generate() {
-	std::vector<Brick> scene;
-	scene.resize(cells * cells * cells_height);
+void Scene::generate_supercell(int start_x, int start_y, int start_z) {
+	SimplexNoise noise(1.f, 1.f, 2.f, 0.5f);
 
-	auto begin = std::chrono::steady_clock::now();
+	std::vector<float> heights;
+	heights.reserve(supergrid_cell_size * brick_size * supergrid_cell_size * brick_size);
 
-	auto func = [&](int start, int end) {
-		//FastNoiseSIMD* noise = FastNoiseSIMD::NewFastNoiseSIMD();
+	for (int y = 0; y < supergrid_cell_size * brick_size; y++) {
+		for (int x = 0; x < supergrid_cell_size * brick_size; x++) {
+			float h = noise.fractal(7, (start_x * brick_size + x) / 1024.f, (start_y * brick_size + y) / 1024.f) * (grid_height / 2.f) + (grid_height / 2.f);
+			heights.push_back(h);
+		}
+	}
 
-		//float* noiseSet = noise->GetSimplexSet(0, start * cell_size, 0, cells * cell_size, (end - start) * cell_size, 1);  
-		SimplexNoise noise(1.f, 1.f, 2.f, 0.5f);
-		
-		for (int y = start; y < end; y++) {
-			for (int x = 0; x < cells; x++) {
-				for (int cell_x = 0; cell_x < cell_size; cell_x++) {
-					for (int cell_y = 0; cell_y < cell_size; cell_y++) {
-						//float height = SimplexNoise::noise((x * cell_size + cell_x) / 256.f, (y * cell_size + cell_y) / 256.f); // * (grid_height / 2.f) + (grid_height / 2.f);
-						//float height = noiseSet[x * cell_size + cell_x + ((y - start) * cell_size + cell_y) * ((end - start) * cell_size)]; //*(grid_height / 2.f) + (grid_height / 2.f);
-						float height = noise.fractal(7, (x * cell_size + cell_x) / 1024.f, (y * cell_size + cell_y) / 1024.f) * (grid_height / 2.f) + (grid_height / 2.f);
+	Supercell supercell;
 
-						for (int z = 0; z < height; z++) {
-							uint32_t sub_data = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) / (sizeof(uint32_t) * 8);
-							uint32_t bit_position = (cell_x + cell_y * cell_size + (z % cell_size) * cell_size * cell_size) % (sizeof(uint32_t) * 8);
-
-
-							//scene[x + y * cells + (z / cell_size) * cells * cells].data[sub_data] |= (1 << bit_position);
-							scene[x + y * cells + (z / cell_size) * cells * cells].data[sub_data] |= (1 << bit_position);
+	//supercell.reserve(supergrid_cell_size * supergrid_cell_size * supergrid_cell_size);
+	supercell.indices.resize(supergrid_cell_size * supergrid_cell_size * supergrid_cell_size, 0);
+	for (int z = 0; z < supergrid_cell_size; z++) {
+		for (int y = 0; y < supergrid_cell_size; y++) {
+			for (int x = 0; x < supergrid_cell_size; x++) {
+				Brick brick{};
+				for (int cell_x = 0; cell_x < brick_size; cell_x++) {
+					for (int cell_y = 0; cell_y < brick_size; cell_y++) {
+						for (int cell_z = 0; cell_z < brick_size; cell_z++) {
+							if ((start_z + z) * brick_size + cell_z < heights[cell_x + x * brick_size + (cell_y + y * brick_size) * brick_size * supergrid_cell_size]) {
+								uint32_t sub_data = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) / (sizeof(uint32_t) * 8);
+								uint32_t bit_position = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) % (sizeof(uint32_t) * 8);
+								brick.data[sub_data] |= (1 << bit_position);
+							}
 						}
 					}
 				}
+				bool empty = true;
+				for (int j = 0; j < cell_members; j++) {
+					empty = empty && !brick.data[j];
+				}
+				if (!empty) {
+					supercell.bricks.push_back(brick);
+					// ToDo morton order
+					supercell.indices[x + y * supergrid_cell_size + z * supergrid_cell_size * supergrid_cell_size] = (supercell.bricks.size() - 1) | brick_loaded_bit;
+				}
 			}
 		}
-	//	FastNoiseSIMD::FreeNoiseSet(noiseSet);
-	};
-
-
-	constexpr int thread_count = 16;
-	std::thread threads[thread_count];
-	for (int i = 0; i < thread_count; i++) {
-		threads[i] = std::thread(func, (cells / thread_count) * i, (cells / thread_count) * (i + 1));
 	}
+	supergrid.push_back(supercell);
+}
 
-	for (int i = 0; i < thread_count; i++) {
-		threads[i].join();
+void Scene::generate() {
+	auto begin = std::chrono::steady_clock::now();
+	for (int z = 0; z < supergrid_z; z++) {
+		for (int y = 0; y < supergrid_xy; y++) {
+			for (int x = 0; x < supergrid_xy; x++) {
+				generate_supercell(x * supergrid_cell_size, y * supergrid_cell_size, z * supergrid_cell_size);
+			}
+		}
 	}
 
 	std::cout << "Generation took " << (std::chrono::steady_clock::now() - begin).count() / 1'000'000 << "ms\n";
 	begin = std::chrono::steady_clock::now();
 
-	std::vector<uint32_t> grid;
-	grid.resize(cells * cells * cells_height, UINT_MAX);
-
-	int count = 0;
-	for (int i = 0; i < cells * cells * cells_height; i++) {
-		for (int j = 0; j < cell_members; j++) {
-			if (scene[i].data[j]) {
-				int mort = morton(i % cells) + (morton(i / cells % cells) << 1) + (morton(i / (cells_height * cells_height)) << 2);
-				grid[mort] = count;
-				count++;
-				break;
-			}
-		}
+	// Copy supercell content to GPU
+	std::vector<Brick*> gpu_supercells;
+	std::vector<uint32_t*> gpu_superindices;
+	for (const auto& i : supergrid) {
+		gpu_supercells.push_back(nullptr);
+		gpu_superindices.push_back(nullptr);
+		// cudaMallocPitch for proper row alignment?
+		cuda(Malloc(&gpu_supercells.back(), i.bricks.size() * sizeof(Brick)));
+		cuda(Memcpy(gpu_supercells.back(), i.bricks.data(), i.bricks.size() * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
+		cuda(Malloc(&gpu_superindices.back(), i.indices.size() * sizeof(uint32_t)));
+		cuda(Memcpy(gpu_superindices.back(), i.indices.data(), i.indices.size() * sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
 	}
 
-	std::cout << "Counting bricks took " << (std::chrono::steady_clock::now() - begin).count() / 1'000'000 << "ms\n";
+	// Copy pointers for supergrid to GPU
+	cuda(Malloc(&gpuScene.bricks, gpu_supercells.size() * sizeof(Brick*)));
+	cuda(Memcpy(gpuScene.bricks, gpu_supercells.data(), gpu_supercells.size() * sizeof(Brick*), cudaMemcpyKind::cudaMemcpyHostToDevice));
+	cuda(Malloc(&gpuScene.indices, gpu_superindices.size() * sizeof(uint32_t*)));
+	cuda(Memcpy(gpuScene.indices, gpu_superindices.data(), gpu_superindices.size() * sizeof(uint32_t*), cudaMemcpyKind::cudaMemcpyHostToDevice));
+
+	cuda(Malloc(&gpuScene.brick_load_queue_count, 4));
+	cuda(Memset(gpuScene.brick_load_queue_count, 0, 4));
+
+	cuda(Malloc(&gpuScene.brick_load_queue, brick_load_queue_size * sizeof(glm::vec3)));
+	cuda(Memset(gpuScene.brick_load_queue, 0, brick_load_queue_size * sizeof(glm::vec3)));
+
+	std::cout << "Allocation took " << (std::chrono::steady_clock::now() - begin).count() / 1'000'000 << "ms\n";
 	begin = std::chrono::steady_clock::now();
+}
 
-	// Allocate space for grid containing indices into the brick storage
-	cuda(Malloc(&gpuScene.brick_grid, cells * cells * cells_height * sizeof(uint32_t)));
-	cuda(Memcpy(gpuScene.brick_grid, grid.data(), cells * cells * cells_height * sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
+void Scene::process_load_queue() {
+	//uint32_t brick_to_load_count = 0;
+	//cudaMemcpy(&brick_to_load_count, gpuScene.brick_load_queue_count, sizeof(uint32_t), cudaMemcpyDeviceToHost);
 
-	// Compact grid
-	auto new_end = std::remove_if(scene.begin(), scene.end(), [](Brick& brick) {
-		for (int j = 0; j < cell_members; j++) {
-			if (brick.data[j]) {
-				return false;
-			}
-		}
-		return true;
-	});
-	scene.erase(new_end, scene.end());
+	//std::vector<glm::ivec3> bricks_to_load;
+	//bricks_to_load.resize(brick_load_queue_size);
 
-	// Allocate space and copy bricks
-	cuda(Malloc(&gpuScene.bricks, count * sizeof(Brick)));
-	cuda(Memcpy(gpuScene.bricks, scene.data(), count * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
+	//cudaMemcpy(bricks_to_load.data(), gpuScene.brick_load_queue, brick_load_queue_size * sizeof(glm::ivec3), cudaMemcpyDeviceToHost);
 
-	std::cout << "Allocating/Copying took " << (std::chrono::steady_clock::now() - begin).count() / 1'000'000 << "ms\n";
+	//std::cout << brick_to_load_count << "\n";
 }

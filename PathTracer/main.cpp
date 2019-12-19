@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#define PERFORMANCE_TEST
+//#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
 	std::cout << description << "\n";
@@ -112,10 +112,6 @@ int main(int argc, char* argv[]) {
 	Scene scene;
 	scene.generate();
 
-//#ifdef PERFORMANCE_TEST
-//	std::ofstream test_file("performance.txt");
-//#endif
-
 	// Allocate ray queue buffer
 	RayQueue* ray_buffer_work;
 	cuda(Malloc(&ray_buffer_work, ray_queue_buffer_size * sizeof(RayQueue)));
@@ -128,12 +124,6 @@ int main(int argc, char* argv[]) {
 
 	glm::vec4* blit_buffer;
 	cuda(Malloc(&blit_buffer, render_width * render_height * sizeof(glm::vec4)));
-
-	unsigned int* primary_ray_count;
-	cudaMalloc((void**)&primary_ray_count, sizeof(int));
-
-	unsigned int* shadow_ray_count;
-	cudaMalloc((void**)&shadow_ray_count, sizeof(int));
 
 	double previous_time = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
@@ -162,6 +152,9 @@ int main(int argc, char* argv[]) {
 		camera.update();
 
 		launch_kernels(interop.ca, blit_buffer, scene.gpuScene, ray_buffer_work, ray_buffer_next, shadow_queue_buffer);
+
+		scene.process_load_queue();
+
 		std::swap(ray_buffer_work, ray_buffer_next);
 		interop.blit();
 

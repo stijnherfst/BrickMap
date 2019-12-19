@@ -30,6 +30,9 @@
     <CudaCompile Include="sunsky.cu">
       <Filter>Kernels</Filter>
     </CudaCompile>
+    <CudaCompile Include="voxel.cu">
+      <Filter>Kernels</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="assert_cuda.h">
@@ -68,9 +71,6 @@
     <ClInclude Include="IMGUI\imstb_truetype.h">
       <Filter>Header Files\IMGUI</Filter>
     </ClInclude>
-    <ClInclude Include="Bbox.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="imgui_impl_glfw.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -94,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="FastNoiseSIMD\FastNoiseSIMD_internal.h">
       <Filter>Header Files\FastNoise</Filter>
+    </ClInclude>
+    <ClInclude Include="voxel.cuh">
+      <Filter>Kernels</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -129,9 +132,6 @@
     </ClCompile>
     <ClCompile Include="IMGUI\imgui_widgets.cpp">
       <Filter>Source Files\IMGUI</Filter>
-    </ClCompile>
-    <ClCompile Include="Bbox.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="imgui_impl_opengl3.cpp">
       <Filter>Source Files</Filter>
