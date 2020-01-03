@@ -272,7 +272,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 			//distance = new_distance * 8.f + tminn + epsilon;
 			//return true;
 			
-			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &p[index & 0x7FFFFFFFu])) {
+			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &p[index & 0x7FFFu])) {
 				distance = new_distance * 8.f + sub_distance + tminn + epsilon;
 				return true;
 			}
@@ -421,7 +421,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, glm::vec3 direct
 			//return true;
 
 			Brick* p = scene.bricks[supercell_index];
-			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & 0x7FFFFFFFu])) {
+			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & 0x7FFFu])) {
 				return true;
 			}
 		}

@@ -9,14 +9,15 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
-constexpr static int supergrid_xy = 16;
-constexpr static int supergrid_z = 16;
-constexpr static int supergrid_cell_size = 32;
-
+constexpr static int grid_size = 16384;
+constexpr static int grid_height = 256;
 constexpr static int brick_size = 8;
 
-constexpr static int grid_size = 4096;
-constexpr static int grid_height = 4096;
+constexpr static int supergrid_cell_size = 16;
+constexpr static int supergrid_xy = grid_size / brick_size / supergrid_cell_size;
+constexpr static int supergrid_z = grid_height / brick_size / supergrid_cell_size;
+
+
 constexpr static int cells = grid_size / brick_size;
 constexpr static int cells_height = grid_height / brick_size;
 // The amount of uint32_t members holding voxel bit data
@@ -24,7 +25,8 @@ constexpr static int cell_members = brick_size * brick_size * brick_size / 32;
 
 constexpr static float epsilon = 0.001f;
 
-constexpr static uint32_t brick_loaded_bit = 0x80000000u;
+//constexpr static uint32_t brick_loaded_bit = 0x80000000u;
+constexpr static uint32_t brick_loaded_bit = 0x8000u;
 constexpr static uint32_t brick_unloaded_bit = 0x40000000u;
 constexpr static uint32_t brick_requested_bit = 0x20000000u;
 
