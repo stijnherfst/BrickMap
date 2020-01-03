@@ -302,7 +302,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 }
 
 /// Proccess shadow rays
-__global__ void __launch_bounds__(128) connect(ShadowQueue* queue, Scene::GPUScene sceneData, glm::vec4* blit_buffer) {
+__global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPUScene sceneData, glm::vec4* blit_buffer) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_connect, 1);
 

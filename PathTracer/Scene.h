@@ -7,7 +7,7 @@ struct Brick {
 class Scene {
 public:
 	struct GPUScene {
-		uint32_t** indices;
+		uint16_t** indices;
 		Brick** bricks;
 		glm::ivec3* brick_load_queue;
 		uint32_t* brick_load_queue_count;
@@ -17,10 +17,10 @@ public:
 
 	struct Supercell {
 		std::vector<Brick> bricks;
-		std::vector<uint32_t> indices;
+		std::vector<uint16_t> indices;
 	};
 
-	std::vector<Supercell> supergrid;
+	std::vector<std::unique_ptr<Supercell>> supergrid;
 
 	void generate_supercell(int start_x, int start_y, int start_z);
 	void generate();
