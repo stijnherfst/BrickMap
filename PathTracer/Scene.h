@@ -16,8 +16,13 @@ public:
 	GPUScene gpuScene;
 
 	struct Supercell {
+		int gpu_count = 256;
 		std::vector<Brick> bricks;
 		std::vector<uint16_t> indices;
+		std::vector<uint16_t> gpu_indices;
+		uint16_t* gpu_indices_location;
+		Brick* gpu_brick_location;
+		int gpu_index_highest = 0;
 	};
 
 	std::vector<std::unique_ptr<Supercell>> supergrid;

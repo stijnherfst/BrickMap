@@ -272,11 +272,20 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 			//distance = new_distance * 8.f + tminn + epsilon;
 			//return true;
 			
-			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &p[index & 0x7FFFu])) {
+			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &p[index & brick_loaded_rest])) {
 				distance = new_distance * 8.f + sub_distance + tminn + epsilon;
 				return true;
 			}
 		} else if (index & brick_unloaded_bit) {
+			distance = new_distance * 8.f + tminn + epsilon;
+			if (smallest_component > -1) {
+				normal = glm::vec3(0, 0, 0);
+				normal[smallest_component] = -step[smallest_component];
+			}
+			return true;
+
+
+			
 			uint32_t old = atomicOr(&index, brick_requested_bit);
 
 			if (!(old & brick_requested_bit)) {
@@ -413,18 +422,51 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, glm::vec3 direct
 
 	// Stepping through grid
 	while (1) {
-
-		//uint32_t index = scene.brick_grid[morton(X) + (morton(Y) << 1) + (morton(Z) << 2)];
 		int supercell_index = X / supergrid_cell_size + (Y / supergrid_cell_size) * supergrid_xy + (Z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
-		uint32_t index = scene.indices[supercell_index][X % supergrid_cell_size + (Y % supergrid_cell_size) * supergrid_cell_size + (Z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size];
+		//uint32_t& index = scene.brick_grid[morton(pos.x) + (morton(pos.y) << 1) + (morton(pos.z) << 2)];
+		uint16_t& index = scene.indices[supercell_index][X % supergrid_cell_size + (Y % supergrid_cell_size) * supergrid_cell_size + (Z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size];
 		if (index & brick_loaded_bit) {
-			//return true;
+			float sub_distance = 0.f;
 
 			Brick* p = scene.bricks[supercell_index];
-			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & 0x7FFFu])) {
+
+			//distance = new_distance * 8.f + tminn + epsilon;
+			//return true;
+
+			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & brick_loaded_rest])) {
 				return true;
 			}
+		} else if (index & brick_unloaded_bit) {
+			//return true;
+			//auto t = &index;
+			//bool aligned = t & 0b11u;
+
+			//uint32_t old = atomicOr(reinterpret_cast<uint32_t*>(&index - aligned), brick_requested_bit << (aligned * 2));
+			uint32_t old = atomicOr(&index, brick_requested_bit);
+
+			if (!(old & (brick_requested_bit << (aligned * 2)))) {
+				// request chunk to be loaded
+				const unsigned int load_index = atomicAdd(scene.brick_load_queue_count, 1);
+				if (load_index < brick_load_queue_size) {
+					scene.brick_load_queue[load_index] = glm::ivec3(X, Y, Z);
+				}
+			}
+
+			return true;
 		}
+
+
+		//uint32_t index = scene.brick_grid[morton(X) + (morton(Y) << 1) + (morton(Z) << 2)];
+		//int supercell_index = X / supergrid_cell_size + (Y / supergrid_cell_size) * supergrid_xy + (Z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
+		//uint32_t index = scene.indices[supercell_index][X % supergrid_cell_size + (Y % supergrid_cell_size) * supergrid_cell_size + (Z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size];
+		//if (index & brick_loaded_bit) {
+		//	//return true;
+
+		//	Brick* p = scene.bricks[supercell_index];
+		//	if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & 0x7FFFu])) {
+		//		return true;
+		//	}
+		//}
 		//else if (index & brick_unloaded_bit) {
 			// load?
 		//	return true;
