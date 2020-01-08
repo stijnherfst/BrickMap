@@ -7,7 +7,7 @@ struct Brick {
 class Scene {
 public:
 	struct GPUScene {
-		uint16_t** indices;
+		uint32_t** indices;
 		Brick** bricks;
 		glm::ivec3* brick_load_queue;
 		uint32_t* brick_load_queue_count;
@@ -16,11 +16,11 @@ public:
 	GPUScene gpuScene;
 
 	struct Supercell {
-		int gpu_count = 256;
+		int gpu_count = 512;
 		std::vector<Brick> bricks;
-		std::vector<uint16_t> indices;
-		std::vector<uint16_t> gpu_indices;
-		uint16_t* gpu_indices_location;
+		std::vector<uint32_t> indices;
+		std::vector<uint32_t> gpu_indices;
+		uint32_t* gpu_indices_location;
 		Brick* gpu_brick_location;
 		int gpu_index_highest = 0;
 	};

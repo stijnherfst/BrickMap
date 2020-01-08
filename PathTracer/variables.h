@@ -9,7 +9,7 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
-constexpr static int grid_size = 2048;
+constexpr static int grid_size = 8192;
 constexpr static int grid_height = 256;
 constexpr static int brick_size = 8;
 
@@ -25,11 +25,12 @@ constexpr static int cell_members = brick_size * brick_size * brick_size / 32;
 
 constexpr static float epsilon = 0.001f;
 
-constexpr static uint16_t brick_loaded_bit = 0x8000u;
-constexpr static uint16_t brick_loaded_rest = 0x7FFFu;
-constexpr static uint16_t brick_unloaded_bit = 0x4000u;
-constexpr static uint16_t brick_unloaded_rest = 0x3FFFu;
-constexpr static uint16_t brick_requested_bit = 0x2000u;
+constexpr static uint32_t brick_loaded_bit = 0x8000u;
+constexpr static uint32_t brick_loaded_rest = 0x7FFFu;
+constexpr static uint32_t brick_unloaded_bit = 0x4000u;
+constexpr static uint32_t brick_unloaded_rest = 0x3FFFu;
+constexpr static uint32_t brick_requested_bit = 0x2000u;
+constexpr static uint32_t brick_data_bits = 0x1FFFu;
 
 constexpr static int brick_load_queue_size = 4096;
 

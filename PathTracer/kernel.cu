@@ -200,21 +200,21 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 		RayQueue& ray = ray_buffer[index];
 
 		ray.distance = VERY_FAR;
-		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData);
+		//intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData);
 
-		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
+		if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
 			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
 
-			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
-			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
-			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
+			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
+			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
+			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
 
 			//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
 			//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
 
-			//atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
-		//}
+			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
+		}
 	}
 }
 
@@ -384,8 +384,8 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
 	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);
-	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	//shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+	//connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);
