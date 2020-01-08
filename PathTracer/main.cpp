@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-	
+	scene.dump();
 	glfwDestroyWindow(window);
 	glfwTerminate();
 

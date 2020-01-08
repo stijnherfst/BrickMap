@@ -77,7 +77,7 @@ void Scene::generate() {
 	std::vector<Brick*> gpu_supercells;
 	std::vector<uint32_t*> gpu_superindices;
 	std::vector<uint32_t> temp_indices(supergrid_cell_size * supergrid_cell_size * supergrid_cell_size);
-	
+
 	for (auto& i : supergrid) {
 		for (int j = 0; j < i->indices.size(); j++) {
 			if (i->indices[j] & brick_loaded_bit) {
@@ -90,7 +90,7 @@ void Scene::generate() {
 		gpu_supercells.push_back(nullptr);
 		gpu_superindices.push_back(nullptr);
 		// cudaMallocPitch for proper row alignment?
-		cuda(Malloc(&gpu_supercells.back(), 2048 * sizeof(Brick)));
+		cuda(Malloc(&gpu_supercells.back(), supergrid_starting_size * sizeof(Brick)));
 		//cuda(Malloc(&gpu_supercells.back(), i->bricks.size() * sizeof(Brick)));
 		//cuda(Memcpy(gpu_supercells.back(), i->bricks.data(), i->bricks.size() * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
 		cuda(Malloc(&gpu_superindices.back(), i->indices.size() * sizeof(uint32_t)));
@@ -120,10 +120,10 @@ void Scene::process_load_queue() {
 	uint32_t brick_to_load_count = 0;
 	cuda(Memcpy(&brick_to_load_count, gpuScene.brick_load_queue_count, sizeof(uint32_t), cudaMemcpyDeviceToHost));
 
-	if (brick_to_load_count > 0) {
-		std::cout << brick_to_load_count << "\n";
-	//	puts("a");
+	if (brick_to_load_count == 0) {
+		return;
 	}
+	std::cout << brick_to_load_count << "\n";
 
 	std::vector<glm::ivec3> bricks_to_load;
 	bricks_to_load.resize(brick_load_queue_size);
@@ -136,37 +136,50 @@ void Scene::process_load_queue() {
 		auto& t = supergrid[supergrid_index];
 
 		if (t->gpu_index_highest + 1 == t->gpu_count) {
-			puts("happens\n");
-			continue;
-			// have to relocate the supercell storage
+			Brick* previous = t->gpu_brick_location;
 
-			//Brick* previous = t->gpu_brick_location;
-			//cuda(Malloc(&t->gpu_brick_location, t->gpu_count * 2 * sizeof(Brick)));
-			//cudaMemcpy(t->gpu_brick_location, previous, t->gpu_count * sizeof(Brick), cudaMemcpyDeviceToDevice);
-			//cudaMemcpy(gpuScene.bricks + supergrid_index, t->gpu_brick_location, sizeof(Brick*), cudaMemcpyHostToDevice);
-			//t->gpu_count *= 2;
+			// Grow the storage
+			t->gpu_count *= 2;
+			cuda(Malloc(&t->gpu_brick_location, t->gpu_count * sizeof(Brick)));
+			// Copy old content
+			cuda(Memcpy(t->gpu_brick_location, previous, t->gpu_index_highest * sizeof(Brick), cudaMemcpyDeviceToDevice));
+			// Update pointer to storage
+			cuda(Memcpy(gpuScene.bricks + supergrid_index, &t->gpu_brick_location, sizeof(Brick*), cudaMemcpyHostToDevice));
+			cuda(Free(previous));
 		}
 
-		
 		glm::ivec3 block_pos = pos % supergrid_cell_size;
-		uint32_t index = t->indices[block_pos.x + block_pos.y * supergrid_cell_size + block_pos.z * supergrid_cell_size * supergrid_cell_size];
-
 		uint32_t index_index = block_pos.x + block_pos.y * supergrid_cell_size + block_pos.z * supergrid_cell_size * supergrid_cell_size;
+		uint32_t index = t->indices[index_index];
 
-		if (index == 0) {
-			// empty do nothing
+		if (index == 0) { // The request brick is empty. Shouldn't happen
 			assert(false);
 		}
 
-		Brick& to_upload = t->bricks[index & brick_data_bits];
-		
 		uint32_t new_index = t->gpu_index_highest | brick_loaded_bit;
-		//uint32_t new_index = brick_loaded_bit;
+		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &new_index, sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
 
+		Brick& to_upload = t->bricks[index & brick_data_bits];
+		cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, &to_upload, sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
 
-		cuda(Memcpy(t->gpu_indices_location + index_index, &new_index, sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
-		cuda(Memcpy(t->gpu_brick_location + t->gpu_index_highest, &to_upload, sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
 		t->gpu_index_highest++;
 	}
+
 	cudaMemset(gpuScene.brick_load_queue_count, 0, 4);
+}
+
+void Scene::dump() {
+	std::ofstream file("dump.txt");
+	for (const auto& i : supergrid) {
+		file << i->gpu_index_highest << "\n";
+	}
+
+	//int max = 0;
+	//int total = 0;
+	//for (const auto& i : supergrid) {
+	//	max = std::max(max, i->gpu_index_highest);
+	//	total += i->gpu_index_highest;
+	//}
+	//std::cout << "Average load: " << total / supergrid.size() << "\n";
+	//std::cout << "Max load: " << max << "\n";
 }

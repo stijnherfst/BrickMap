@@ -17,6 +17,7 @@ constexpr static int supergrid_cell_size = 16;
 constexpr static int supergrid_xy = grid_size / brick_size / supergrid_cell_size;
 constexpr static int supergrid_z = grid_height / brick_size / supergrid_cell_size;
 
+constexpr static int supergrid_starting_size = 256;
 
 constexpr static int cells = grid_size / brick_size;
 constexpr static int cells_height = grid_height / brick_size;
@@ -32,7 +33,7 @@ constexpr static uint32_t brick_unloaded_rest = 0x3FFFu;
 constexpr static uint32_t brick_requested_bit = 0x2000u;
 constexpr static uint32_t brick_data_bits = 0x1FFFu;
 
-constexpr static int brick_load_queue_size = 4096;
+constexpr static int brick_load_queue_size = 512;
 
 extern glm::vec2 sun_position;
 extern bool sun_position_changed;

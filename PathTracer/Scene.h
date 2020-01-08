@@ -16,7 +16,7 @@ public:
 	GPUScene gpuScene;
 
 	struct Supercell {
-		int gpu_count = 512;
+		int gpu_count = supergrid_starting_size;
 		std::vector<Brick> bricks;
 		std::vector<uint32_t> indices;
 		std::vector<uint32_t> gpu_indices;
@@ -30,4 +30,5 @@ public:
 	void generate_supercell(int start_x, int start_y, int start_z);
 	void generate();
 	void process_load_queue();
+	void dump();
 };
