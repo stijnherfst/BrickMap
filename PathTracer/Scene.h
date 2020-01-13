@@ -27,6 +27,14 @@ public:
 
 	std::vector<std::unique_ptr<Supercell>> supergrid;
 
+	Brick* brick_gpu_staging;
+	uint32_t* indices_gpu_staging;
+
+	Scene();
+	~Scene();
+
+
+
 	void generate_supercell(int start_x, int start_y, int start_z);
 	void generate();
 	void process_load_queue();

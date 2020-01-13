@@ -10,7 +10,7 @@ constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
 constexpr static int grid_size = 4096;
-constexpr static int grid_height = 4096;
+constexpr static int grid_height = 256;
 constexpr static int brick_size = 8;
 
 constexpr static int supergrid_cell_size = 16;

@@ -12,6 +12,16 @@ __forceinline unsigned int morton(unsigned int x) {
 
 //std::mutex mtx;
 
+Scene::Scene() {
+	cuda(HostAlloc(&brick_gpu_staging, brick_load_queue_size * sizeof(Brick), cudaHostAllocDefault));
+	cuda(HostAlloc(&indices_gpu_staging, brick_load_queue_size * sizeof(uint32_t), cudaHostAllocDefault));
+}
+
+Scene::~Scene() {
+	cudaFreeHost(&brick_gpu_staging);
+	cudaFreeHost(&indices_gpu_staging);
+}
+
 void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 	SimplexNoise noise(1.f, 1.f, 2.f, 0.5f);
 
@@ -131,39 +141,38 @@ void Scene::process_load_queue() {
 	//auto begin = std::chrono::steady_clock::now();
 	uint32_t brick_to_load_count = 0;
 	cuda(Memcpy(&brick_to_load_count, gpuScene.brick_load_queue_count, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+	brick_to_load_count = std::min(static_cast<uint32_t>(brick_load_queue_size), brick_to_load_count);
 
 	if (brick_to_load_count == 0) {
 		return;
 	}
 
-	//std::cout << brick_to_load_count << "\n";
+	std::cout << brick_to_load_count << "\n";
 
 	std::vector<glm::ivec3> bricks_to_load;
-	bricks_to_load.resize(brick_load_queue_size);
+	bricks_to_load.resize(brick_to_load_count);
 
-	cuda(Memcpy(bricks_to_load.data(), gpuScene.brick_load_queue, brick_load_queue_size * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
+	cuda(Memcpy(bricks_to_load.data(), gpuScene.brick_load_queue, brick_to_load_count * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
 
 
-	std::sort(bricks_to_load.begin(), bricks_to_load.end(), [](glm::ivec3& l, glm::ivec3& r) {
+	std::sort(bricks_to_load.begin(), bricks_to_load.end(), [](const glm::ivec3& l, const glm::ivec3& r) {
 		int supergrid_index_l = l.x / supergrid_cell_size + l.y / supergrid_cell_size * supergrid_xy + l.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		int supergrid_index_r = r.x / supergrid_cell_size + r.y / supergrid_cell_size * supergrid_xy + r.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		return supergrid_index_l < supergrid_index_r;
 	});
 
-	//int previous_supergrid_index = -1;
-	for (int i = 0; i < std::min(static_cast<uint32_t>(brick_load_queue_size), brick_to_load_count); i++) {
+	int bricks_to_upload = 0;
+	int stage_index = 0;
+	//int upload_pos = 0;
+	for (int i = 0; i < brick_to_load_count; i++) {
 		const glm::ivec3& pos = bricks_to_load[i];
 		int supergrid_index = pos.x / supergrid_cell_size + pos.y / supergrid_cell_size * supergrid_xy + pos.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
-		
-		//if (i == 0) {
-		//	previous_supergrid_index = supergrid_index;
-		//}
-
+	
 		auto& t = supergrid[supergrid_index];
 
-		if (t->gpu_index_highest + 1 == t->gpu_count) {
+		if ((t->gpu_index_highest + bricks_to_upload + 1) == t->gpu_count) {
 			Brick* previous = t->gpu_brick_location;
-
+			
 			// Grow the storage
 			t->gpu_count *= 2;
 			cuda(Malloc(&t->gpu_brick_location, t->gpu_count * sizeof(Brick)));
@@ -172,6 +181,7 @@ void Scene::process_load_queue() {
 			// Update pointer to storage
 			cuda(Memcpy(gpuScene.bricks + supergrid_index, &t->gpu_brick_location, sizeof(Brick*), cudaMemcpyHostToDevice));
 			cuda(Free(previous));
+			//continue;
 		}
 
 		glm::ivec3 block_pos = pos % supergrid_cell_size;
@@ -182,20 +192,25 @@ void Scene::process_load_queue() {
 			assert(false);
 		}
 
-		Brick& to_upload = t->bricks[index & brick_data_bits];
-		cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, &to_upload, sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
-		
-		uint32_t new_index = t->gpu_index_highest | brick_loaded_bit;
-		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &new_index, sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
+		indices_gpu_staging[stage_index] = (t->gpu_index_highest + bricks_to_upload) | brick_loaded_bit;
+		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &indices_gpu_staging[stage_index], sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
 
+		brick_gpu_staging[stage_index] = t->bricks[index & brick_data_bits];
+		stage_index++;
+		bricks_to_upload++;
 
-		t->gpu_index_highest++;
+		int next_superindex = 0;
+		if (i + 1 < brick_to_load_count) {
+			const glm::ivec3& next_pos = bricks_to_load[i + 1] / supergrid_cell_size;
+			next_superindex = next_pos.x + next_pos.y * supergrid_xy + next_pos.z * supergrid_xy * supergrid_xy;
+		}
 
-		//if (previous_supergrid_index != supergrid_index) {
-		//
-		//}
+		if (i + 1 == brick_to_load_count - 1 || supergrid_index != next_superindex) {
+			cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, brick_gpu_staging + stage_index - bricks_to_upload, bricks_to_upload * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
+			t->gpu_index_highest += bricks_to_upload;
 
-		//previous_supergrid_index = supergrid_index;
+			bricks_to_upload = 0;
+		}
 	}
 
 	cudaMemset(gpuScene.brick_load_queue_count, 0, 4);
