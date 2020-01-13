@@ -22,5 +22,6 @@ struct PerformanceMeasure {
 	PerformanceMeasure();
 
 	/// Measures the performance by cycling through some scenes. Will return true if measuring is over
-	bool measure(double delta);
+	bool measure_path(double delta);
+	bool measure_convergence(double delta);
 };

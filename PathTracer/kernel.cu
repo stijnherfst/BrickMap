@@ -198,20 +198,20 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 			return;
 		}
 		RayQueue& ray = ray_buffer[index];
-
+		
 		ray.distance = VERY_FAR;
 		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData);
 
 		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
-		//	//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
+			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
 
-		//	atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
-		//	atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
-		//	atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 100.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 200.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 3000.f);
 
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
+			//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
 
 		//	atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 		//}
@@ -381,6 +381,7 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 		int new_value = 0;
 		cuda(MemcpyToSymbol(primary_ray_cnt, &new_value, sizeof(int)));
 	}
+
 	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
 	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);

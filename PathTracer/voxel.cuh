@@ -21,8 +21,8 @@ __device__ bool intersect_aabb_branchless2(const glm::vec3& origin, const glm::v
 }
 
 __device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, Brick* brick) {
-	origin = glm::mod(origin, 8.f);
 	glm::ivec3 pos = origin;
+	
 	glm::ivec3 out;
 	glm::ivec3 step;
 	glm::vec3 cb, tmax, tdelta;
@@ -43,19 +43,21 @@ __device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, gl
 		tmax.x = (cb.x - origin.x) * rxr;
 		tdelta.x = step.x * rxr;
 	} else
-		tmax.x = 1000000;
+		tmax.x = 1000000.f;
 	if (direction.y != 0) {
 		ryr = 1.0f / direction.y;
 		tmax.y = (cb.y - origin.y) * ryr;
 		tdelta.y = step.y * ryr;
 	} else
-		tmax.y = 1000000;
+		tmax.y = 1000000.f;
 	if (direction.z != 0) {
 		rzr = 1.0f / direction.z;
 		tmax.z = (cb.z - origin.z) * rzr;
 		tdelta.z = step.z * rzr;
 	} else
-		tmax.z = 1000000;
+		tmax.z = 1000000.f;
+
+	pos = pos % 8;
 
 	distance = 0.f;
 	int smallest_component = -1;
@@ -105,7 +107,7 @@ __device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, gl
 }
 
 __device__ inline bool intersect_brick_simple(glm::vec3 origin, glm::vec3 direction, Brick* brick) {
-	origin = glm::mod(origin, 8.f);
+	//origin = glm::mod(origin, 8.f);
 	glm::ivec3 pos = origin;
 	glm::ivec3 out;
 	glm::ivec3 step;
@@ -140,6 +142,8 @@ __device__ inline bool intersect_brick_simple(glm::vec3 origin, glm::vec3 direct
 		tdelta.z = step.z * rzr;
 	} else
 		tmax.z = 1000000;
+
+	pos = pos % 8;
 
 	// Stepping through grid
 	while (1) {
@@ -256,8 +260,8 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 
 			Brick* p = scene.bricks[supercell_index];
 
-			if (intersect_brick(origin * 8.f + direction * (new_distance * 8.f + epsilon), direction, normal, sub_distance, &p[index & brick_data_bits])) {
-				distance = new_distance * 8.f + sub_distance + tminn + epsilon;
+			if (intersect_brick((origin + direction * new_distance) * 8.f - normal * epsilon, direction, normal, sub_distance, &p[index & brick_data_bits])) {
+				distance = new_distance * 8.f + sub_distance + tminn;
 				return true;
 			}
 		} else if (index & brick_unloaded_bit) {
@@ -272,7 +276,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 				} else {
 					atomicAnd(&index, ~brick_requested_bit);
 					//printf("haaaaaaaaaaaaaa\n");
-					// happens a lot. Fix?
+					// ToDo happens a lot. Fix?
 				}
 			}
 
@@ -280,7 +284,7 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 				normal = glm::vec3(0, 0, 0);
 				normal[smallest_component] = -step[smallest_component];
 			}
-			distance = new_distance * 8.f + tminn + epsilon;
+			distance = new_distance * 8.f + tminn;
 			return true;
 		} 
 
@@ -380,7 +384,7 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, glm::vec3 direct
 		tdelta.z = step.z * rzr;
 	} else
 		tmax.z = 1000000;
-
+	
 	float distance = 0.f;
 	while (1) {
 		int supercell_index = pos.x / supergrid_cell_size + (pos.y / supergrid_cell_size) * supergrid_xy + (pos.z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
@@ -391,7 +395,8 @@ __device__ inline bool intersect_voxel_simple(glm::vec3 origin, glm::vec3 direct
 
 			Brick* p = scene.bricks[supercell_index];
 
-			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + epsilon), direction, &p[index & brick_data_bits])) {
+			// ToDo Probably should use the normal to offset into the brick instead of epsilon
+			if (intersect_brick_simple(origin * 8.f + direction * (distance * 8.f + 3.f * epsilon), direction, &p[index & brick_data_bits])) {
 				return true;
 			}
 		} else if (index & brick_unloaded_bit) {

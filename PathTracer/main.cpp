@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) {
 		}
 
 #ifdef PERFORMANCE_TEST
-		bool done = performance.measure(delta);
+		bool done = performance.measure_convergence(delta);
 		if (done) {
 			break;
 		}
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
-	scene.dump();
+	//scene.dump();
 	glfwDestroyWindow(window);
 	glfwTerminate();
 

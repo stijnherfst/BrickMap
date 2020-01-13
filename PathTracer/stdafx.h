@@ -22,6 +22,7 @@
 //#define GLM_FORCE_PURE
 #define GLM_FORCE_CXX17
 #include "glm.hpp"
+#include "gtc/integer.hpp" 
 
 #include "FastNoiseSIMD/FastNoiseSIMD.h"
 #include "SimplexNoise.h"
