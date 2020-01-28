@@ -13,6 +13,7 @@ constexpr int MAX_BOUNCES = 3;
 
 surface<void, cudaSurfaceType2D> surf;
 texture<float, cudaTextureTypeCubemap> skybox;
+cudaStream_t kernel_stream;
 
 //"Xorshift RNGs" by George Marsaglia
 //http://excamera.com/sphinx/article-xorshift.html
@@ -372,29 +373,29 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	if (sun_position_changed) {
 		sun_position_changed = false;
 		reset_buffer = true;
-		cuda(MemcpyToSymbol(SunPos, &sun_position, sizeof(glm::vec2)));
+		cuda(MemcpyToSymbolAsync(SunPos, &sun_position, sizeof(glm::vec2), 0, cudaMemcpyHostToDevice, kernel_stream));
 		glm::vec3 sun_direction = glm::normalize(fromSpherical((sun_position - glm::vec2(0.0, 0.5)) * glm::vec2(6.28f, 3.14f)));
-		cuda(MemcpyToSymbol(sunDirection, &sun_direction, sizeof(glm::vec3)));
+		cuda(MemcpyToSymbolAsync(sunDirection, &sun_direction, sizeof(glm::vec3), 0, cudaMemcpyHostToDevice, kernel_stream));
 	}
 
 	if (reset_buffer) {
 		reset_buffer = false;
-		cudaMemset(blit_buffer, 0, render_width * render_height * sizeof(float4));
-
+		cudaMemsetAsync(blit_buffer, 0, render_width * render_height * sizeof(float4), load_stream);
+		
 		int new_value = 0;
-		cuda(MemcpyToSymbol(primary_ray_cnt, &new_value, sizeof(int)));
+		cuda(MemcpyToSymbolAsync(primary_ray_cnt, &new_value, sizeof(int), 0, cudaMemcpyHostToDevice, kernel_stream));
 	}
 
-
-	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
-	set_wavefront_globals<<<1, 1>>>();
-	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
-	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
+	primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
+	set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
+	cudaStreamSynchronize(load_stream);
+	extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
+	shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+	connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);
-	blit_onto_framebuffer<<<blocks, threads>>>(blit_buffer);
+	blit_onto_framebuffer<<<blocks, threads, 0, kernel_stream>>>(blit_buffer);
 
 	cuda(DeviceSynchronize());
 

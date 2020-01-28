@@ -8,10 +8,11 @@ constexpr static unsigned window_height = 1080;
 
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
+constexpr static int thread_count = 8;
 
 // Most other variables are calculated from this
-constexpr static int grid_size = 4096;
-constexpr static int grid_height = 4096;
+constexpr static int grid_size = 8192;
+constexpr static int grid_height = 512;
 constexpr static int brick_size = 8;
 
 constexpr static int supergrid_cell_size = 16;
@@ -44,6 +45,8 @@ constexpr static int brick_load_queue_size = 512;
 extern glm::vec2 sun_position;
 extern bool sun_position_changed;
 extern int sm_cores;
+extern cudaStream_t load_stream;
+extern cudaStream_t kernel_stream;
 
 struct RayQueue {
 	glm::vec3 origin;

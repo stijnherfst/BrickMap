@@ -4,6 +4,8 @@
 #include <mutex>
 #include <thread>
 
+cudaStream_t load_stream;
+
 __forceinline unsigned int morton(unsigned int x) {
 	x = (x ^ (x << 16)) & 0xff0000ff, x = (x ^ (x << 8)) & 0x0300f00f;
 	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
@@ -16,6 +18,8 @@ Scene::Scene() {
 	cuda(HostAlloc(&bricks_to_load, brick_load_queue_size * sizeof(glm::ivec3), cudaHostAllocDefault));
 	cuda(HostAlloc(&brick_gpu_staging, brick_load_queue_size * sizeof(Brick), cudaHostAllocDefault));
 	cuda(HostAlloc(&indices_gpu_staging, brick_load_queue_size * sizeof(uint32_t), cudaHostAllocDefault));
+	cudaStreamCreate(&load_stream);
+	cudaStreamCreate(&kernel_stream);
 }
 
 Scene::~Scene() {
@@ -32,10 +36,25 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 
 	for (int y = 0; y < supergrid_cell_size * brick_size; y++) {
 		for (int x = 0; x < supergrid_cell_size * brick_size; x++) {
-			float h = noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f) * (grid_height / 2.f) + (grid_height / 2.f);
+			float h = noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f) * (grid_height / 2.f) + grid_height / 2.f;
 			heights.push_back(h);
 		}
 	}
+	
+	//FastNoiseSIMD* myNoise = FastNoiseSIMD::NewFastNoiseSIMD();
+	////myNoise->set
+	//myNoise->SetFrequency(0.005f);
+	////myNoise->setampl(1.f);
+	////myNoise->SetFrequency(1.f);
+	////myNoise->setac(1.f);
+	//myNoise->SetFractalOctaves(7);
+	//float* noiseSet = myNoise->GetPerlinFractalSet(
+	//	start_x * supergrid_cell_size * brick_size,
+	//	start_y * supergrid_cell_size * brick_size, 
+	//	0, 
+	//	supergrid_cell_size * brick_size, 
+	//	supergrid_cell_size * brick_size, 
+	//	1);
 
 	auto supercell = std::make_unique<Supercell>();
 
@@ -49,8 +68,10 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 				uint32_t lod_2x2x2 = 0;
 				for (int cell_x = 0; cell_x < brick_size; cell_x++) {
 					for (int cell_y = 0; cell_y < brick_size; cell_y++) {
+						float height = heights[cell_x + x * brick_size + (cell_y + y * brick_size) * brick_size * supergrid_cell_size];
+						//float height = noiseSet[cell_x + x * brick_size + (cell_y + y * brick_size) * brick_size * supergrid_cell_size] * (grid_height / 2.f) + grid_height / 2.f;
 						for (int cell_z = 0; cell_z < brick_size; cell_z++) {
-							if ((start_z * supergrid_cell_size + z) * brick_size + cell_z < heights[cell_x + x * brick_size + (cell_y + y * brick_size) * brick_size * supergrid_cell_size]) {
+							if ((start_z * supergrid_cell_size + z) * brick_size + cell_z < height) {
 								uint32_t sub_data = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) / (sizeof(uint32_t) * 8);
 								uint32_t bit_position = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) % (sizeof(uint32_t) * 8);
 								brick.data[sub_data] |= (1 << bit_position);
@@ -70,18 +91,19 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 		}
 	}
 	supergrid[start_x + start_y * supergrid_xy + start_z * supergrid_xy * supergrid_xy] = std::move(supercell);
+	//FastNoiseSIMD::FreeNoiseSet(noiseSet);
 }
 
 void Scene::generate() {
 	auto begin = std::chrono::steady_clock::now();
 
-	std::array<std::thread, 16> threads;
+	std::array<std::thread, thread_count> threads;
 
 	supergrid.resize(supergrid_z * supergrid_xy * supergrid_xy);
 
-	for (int i = 0; i < 16; i++) {
+	for (int i = 0; i < thread_count; i++) {
 		threads[i] = std::thread([i, this]() {
-			for (int x = i * (supergrid_xy / 16); x < (i + 1) * (supergrid_xy / 16); x++) {
+			for (int x = i * (supergrid_xy / thread_count); x < (i + 1) * (supergrid_xy / thread_count); x++) {
 				for (int y = 0; y < supergrid_xy; y++) {
 					for (int z = 0; z < supergrid_z; z++) {
 						generate_supercell(x, y, z);
@@ -140,7 +162,6 @@ void Scene::generate() {
 }
 
 void Scene::process_load_queue() {
-	//auto begin = std::chrono::steady_clock::now();
 	uint32_t brick_to_load_count = 0;
 	cuda(Memcpy(&brick_to_load_count, gpuScene.brick_load_queue_count, sizeof(uint32_t), cudaMemcpyDeviceToHost));
 	brick_to_load_count = std::min(static_cast<uint32_t>(brick_load_queue_size), brick_to_load_count);
@@ -149,22 +170,18 @@ void Scene::process_load_queue() {
 		return;
 	}
 
-	std::cout << brick_to_load_count << "\n";
-
-	//std::vector<glm::ivec3> bricks_to_load;
-	//bricks_to_load.resize(brick_to_load_count);
-
 	cuda(Memcpy(bricks_to_load, gpuScene.brick_load_queue, brick_to_load_count * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
-
+	
 	std::sort(bricks_to_load, bricks_to_load + brick_to_load_count, [](const glm::ivec3& l, const glm::ivec3& r) {
 		int supergrid_index_l = l.x / supergrid_cell_size + l.y / supergrid_cell_size * supergrid_xy + l.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		int supergrid_index_r = r.x / supergrid_cell_size + r.y / supergrid_cell_size * supergrid_xy + r.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		return supergrid_index_l < supergrid_index_r;
 	});
 
+	int group_size = 0;
+
 	int bricks_to_upload = 0;
 	int stage_index = 0;
-	//int upload_pos = 0;
 	for (int i = 0; i < brick_to_load_count; i++) {
 		const glm::ivec3& pos = bricks_to_load[i];
 		int supergrid_index = pos.x / supergrid_cell_size + pos.y / supergrid_cell_size * supergrid_xy + pos.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
@@ -178,11 +195,10 @@ void Scene::process_load_queue() {
 			t->gpu_count *= 2;
 			cuda(Malloc(&t->gpu_brick_location, t->gpu_count * sizeof(Brick)));
 			// Copy old content
-			cuda(Memcpy(t->gpu_brick_location, previous, t->gpu_index_highest * sizeof(Brick), cudaMemcpyDeviceToDevice));
+			cuda(MemcpyAsync(t->gpu_brick_location, previous, t->gpu_index_highest * sizeof(Brick), cudaMemcpyDeviceToDevice, load_stream));
 			// Update pointer to storage
-			cuda(Memcpy(gpuScene.bricks + supergrid_index, &t->gpu_brick_location, sizeof(Brick*), cudaMemcpyHostToDevice));
+			cuda(MemcpyAsync(gpuScene.bricks + supergrid_index, &t->gpu_brick_location, sizeof(Brick*), cudaMemcpyHostToDevice, load_stream));
 			cuda(Free(previous));
-			//continue;
 		}
 
 		glm::ivec3 block_pos = pos % supergrid_cell_size;
@@ -194,7 +210,7 @@ void Scene::process_load_queue() {
 		}
 
 		indices_gpu_staging[stage_index] = (t->gpu_index_highest + bricks_to_upload) | brick_loaded_bit | (index & brick_lod_bits);
-		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &indices_gpu_staging[stage_index], sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
+		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &indices_gpu_staging[stage_index], sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice, load_stream));
 
 		brick_gpu_staging[stage_index] = t->bricks[index & brick_index_bits];
 		stage_index++;
@@ -207,16 +223,12 @@ void Scene::process_load_queue() {
 		}
 
 		if (i + 1 == brick_to_load_count - 1 || supergrid_index != next_superindex) {
-			cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, brick_gpu_staging + stage_index - bricks_to_upload, bricks_to_upload * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
+			cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, brick_gpu_staging + stage_index - bricks_to_upload, bricks_to_upload * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice, load_stream));
 			t->gpu_index_highest += bricks_to_upload;
-
 			bricks_to_upload = 0;
 		}
 	}
-
-	cudaMemset(gpuScene.brick_load_queue_count, 0, 4);
-
-	//std::cout << (std::chrono::steady_clock::now() - begin).count() / 1'000 << "\n";
+	cudaMemsetAsync(gpuScene.brick_load_queue_count, 0, 4, load_stream);
 }
 
 void Scene::dump() {
@@ -224,13 +236,4 @@ void Scene::dump() {
 	for (const auto& i : supergrid) {
 		file << i->gpu_index_highest << "\n";
 	}
-
-	//int max = 0;
-	//int total = 0;
-	//for (const auto& i : supergrid) {
-	//	max = std::max(max, i->gpu_index_highest);
-	//	total += i->gpu_index_highest;
-	//}
-	//std::cout << "Average load: " << total / supergrid.size() << "\n";
-	//std::cout << "Max load: " << max << "\n";
 }

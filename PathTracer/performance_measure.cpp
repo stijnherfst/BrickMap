@@ -78,8 +78,8 @@ bool PerformanceMeasure::measure_convergence(double delta) {
 	delta_min = std::min(delta_min, delta);
 	delta_max = std::max(delta_max, delta);
 
-	// Every 10 seconds
-	if (glfwGetTime() - last_time > 10.f) {
+	// Every 5 seconds
+	if (glfwGetTime() - last_time > 5.f) {
 		last_time = glfwGetTime();
 
 		double average_delta = std::accumulate(times.begin(), times.end(), 0.f) / times.size();
