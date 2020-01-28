@@ -1,7 +1,7 @@
 #include "stdafx.h"
 
 void Camera::handle_input(GLFWwindow* window, double delta) {
-	float speed = 1;
+	float speed = 10;
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT)) {
 		speed = 400;
 	}

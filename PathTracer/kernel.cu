@@ -190,7 +190,7 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 }
 
 /// Advance the ray segments once
-__global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed) {
+__global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed, glm::ivec3 camera_position) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_extend, 1);
 
@@ -200,18 +200,18 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 		RayQueue& ray = ray_buffer[index];
 		
 		ray.distance = VERY_FAR;
-		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData);
+		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData, camera_position);
 
-		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData)) {
-			//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
+		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData, camera_position)) {
+		//	//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
 
-			//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 100.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 200.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 3000.f);
+		//	atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 10.f);
+		//	atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 20.f);
+		//	atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 30.f);
 
-			//atomicAdd(&blit_buffer[ray.pixel_index].r, 1.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].g, 1.f);
-			//atomicAdd(&blit_buffer[ray.pixel_index].b, 1.f);
+		//	//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
+		//	//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
+		//	//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
 
 		//	atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 		//}
@@ -302,7 +302,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 }
 
 /// Proccess shadow rays
-__global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPUScene sceneData, glm::vec4* blit_buffer) {
+__global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPUScene sceneData, glm::vec4* blit_buffer, glm::ivec3 camera_position) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_connect, 1);
 
@@ -312,7 +312,10 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 
 		ShadowQueue ray = queue[index];
 
-		if (!intersect_voxel_simple(ray.origin, ray.direction, sceneData)) {
+		//if (!intersect_voxel_simple(ray.origin, ray.direction, sceneData, camera_position)) {
+		glm::vec3 y{};
+		float t = 0.f;
+		if (!intersect_voxel(ray.origin, ray.direction, y, t, sceneData, camera_position)) {
 			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.color.r);
 			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.color.g);
 			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.color.b);
@@ -382,11 +385,12 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 		cuda(MemcpyToSymbol(primary_ray_cnt, &new_value, sizeof(int)));
 	}
 
+
 	primary_rays<<<sm_cores * 8, 128>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
 	set_wavefront_globals<<<1, 1>>>();
-	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame);
+	extend<<<sm_cores * 8, 128>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
 	shade<<<sm_cores * 8, 128>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer);
+	connect<<<sm_cores * 8, 128>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);

@@ -13,11 +13,13 @@ __forceinline unsigned int morton(unsigned int x) {
 //std::mutex mtx;
 
 Scene::Scene() {
+	cuda(HostAlloc(&bricks_to_load, brick_load_queue_size * sizeof(glm::ivec3), cudaHostAllocDefault));
 	cuda(HostAlloc(&brick_gpu_staging, brick_load_queue_size * sizeof(Brick), cudaHostAllocDefault));
 	cuda(HostAlloc(&indices_gpu_staging, brick_load_queue_size * sizeof(uint32_t), cudaHostAllocDefault));
 }
 
 Scene::~Scene() {
+	cudaFreeHost(&bricks_to_load);
 	cudaFreeHost(&brick_gpu_staging);
 	cudaFreeHost(&indices_gpu_staging);
 }
@@ -42,6 +44,9 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 		for (int y = 0; y < supergrid_cell_size; y++) {
 			for (int x = 0; x < supergrid_cell_size; x++) {
 				Brick brick{};
+				bool empty = true;
+
+				uint32_t lod_2x2x2 = 0;
 				for (int cell_x = 0; cell_x < brick_size; cell_x++) {
 					for (int cell_y = 0; cell_y < brick_size; cell_y++) {
 						for (int cell_z = 0; cell_z < brick_size; cell_z++) {
@@ -49,18 +54,17 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 								uint32_t sub_data = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) / (sizeof(uint32_t) * 8);
 								uint32_t bit_position = (cell_x + cell_y * brick_size + cell_z * brick_size * brick_size) % (sizeof(uint32_t) * 8);
 								brick.data[sub_data] |= (1 << bit_position);
+								empty = false;
+								lod_2x2x2 |= 1 << (((cell_x & 0b100) >> 2) + ((cell_y & 0b100) >> 1) + (cell_z & 0b100));
 							}
 						}
 					}
 				}
-				bool empty = true;
-				for (int j = 0; j < cell_members; j++) {
-					empty = empty && !brick.data[j];
-				}
+
 				if (!empty) {
 					supercell->bricks.push_back(brick);
 					// ToDo morton order
-					supercell->indices[x + y * supergrid_cell_size + z * supergrid_cell_size * supergrid_cell_size] = (supercell->bricks.size() - 1) | brick_loaded_bit;
+					supercell->indices[x + y * supergrid_cell_size + z * supergrid_cell_size * supergrid_cell_size] = (supercell->bricks.size() - 1) | brick_loaded_bit | (lod_2x2x2 << 12);
 				}
 			}
 		}
@@ -102,7 +106,7 @@ void Scene::generate() {
 	for (auto& i : supergrid) {
 		for (int j = 0; j < i->indices.size(); j++) {
 			if (i->indices[j] & brick_loaded_bit) {
-				temp_indices[j] = brick_unloaded_bit;
+				temp_indices[j] = brick_unloaded_bit | (i->indices[j] & brick_lod_bits);
 			} else {
 				temp_indices[j] = 0;
 			}
@@ -112,8 +116,6 @@ void Scene::generate() {
 		gpu_superindices.push_back(nullptr);
 		// cudaMallocPitch for proper row alignment?
 		cuda(Malloc(&gpu_supercells.back(), supergrid_starting_size * sizeof(Brick)));
-		//cuda(Malloc(&gpu_supercells.back(), i->bricks.size() * sizeof(Brick)));
-		//cuda(Memcpy(gpu_supercells.back(), i->bricks.data(), i->bricks.size() * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice));
 		cuda(Malloc(&gpu_superindices.back(), i->indices.size() * sizeof(uint32_t)));
 
 		cuda(Memcpy(gpu_superindices.back(), temp_indices.data(), temp_indices.size() * sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
@@ -149,13 +151,12 @@ void Scene::process_load_queue() {
 
 	std::cout << brick_to_load_count << "\n";
 
-	std::vector<glm::ivec3> bricks_to_load;
-	bricks_to_load.resize(brick_to_load_count);
+	//std::vector<glm::ivec3> bricks_to_load;
+	//bricks_to_load.resize(brick_to_load_count);
 
-	cuda(Memcpy(bricks_to_load.data(), gpuScene.brick_load_queue, brick_to_load_count * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
+	cuda(Memcpy(bricks_to_load, gpuScene.brick_load_queue, brick_to_load_count * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
 
-
-	std::sort(bricks_to_load.begin(), bricks_to_load.end(), [](const glm::ivec3& l, const glm::ivec3& r) {
+	std::sort(bricks_to_load, bricks_to_load + brick_to_load_count, [](const glm::ivec3& l, const glm::ivec3& r) {
 		int supergrid_index_l = l.x / supergrid_cell_size + l.y / supergrid_cell_size * supergrid_xy + l.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		int supergrid_index_r = r.x / supergrid_cell_size + r.y / supergrid_cell_size * supergrid_xy + r.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		return supergrid_index_l < supergrid_index_r;
@@ -192,10 +193,10 @@ void Scene::process_load_queue() {
 			assert(false);
 		}
 
-		indices_gpu_staging[stage_index] = (t->gpu_index_highest + bricks_to_upload) | brick_loaded_bit;
+		indices_gpu_staging[stage_index] = (t->gpu_index_highest + bricks_to_upload) | brick_loaded_bit | (index & brick_lod_bits);
 		cuda(MemcpyAsync(t->gpu_indices_location + index_index, &indices_gpu_staging[stage_index], sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
 
-		brick_gpu_staging[stage_index] = t->bricks[index & brick_data_bits];
+		brick_gpu_staging[stage_index] = t->bricks[index & brick_index_bits];
 		stage_index++;
 		bricks_to_upload++;
 

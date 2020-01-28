@@ -9,8 +9,9 @@ constexpr static unsigned window_height = 1080;
 constexpr static unsigned render_width = 1920;
 constexpr static unsigned render_height = 1080;
 
+// Most other variables are calculated from this
 constexpr static int grid_size = 4096;
-constexpr static int grid_height = 256;
+constexpr static int grid_height = 4096;
 constexpr static int brick_size = 8;
 
 constexpr static int supergrid_cell_size = 16;
@@ -26,12 +27,17 @@ constexpr static int cell_members = brick_size * brick_size * brick_size / 32;
 
 constexpr static float epsilon = 0.001f;
 
-constexpr static uint32_t brick_loaded_bit = 0x8000u;
-constexpr static uint32_t brick_loaded_rest = 0x7FFFu;
-constexpr static uint32_t brick_unloaded_bit = 0x4000u;
-constexpr static uint32_t brick_unloaded_rest = 0x3FFFu;
-constexpr static uint32_t brick_requested_bit = 0x2000u;
-constexpr static uint32_t brick_data_bits = 0x1FFFu;
+// LoD distance for blocksize 1x1x1 representing 8x8x8
+constexpr static int lod_distance_8x8x8 = 600'000;
+// LoD distance for blocksize 2x2x2 representing 8x8x8
+constexpr static int lod_distance_2x2x2 = 100'000;
+
+
+constexpr static uint32_t brick_index_bits = 0xFFFu;
+constexpr static uint32_t brick_lod_bits = 0xFF000u;
+constexpr static uint32_t brick_loaded_bit = 0x80000000u;
+constexpr static uint32_t brick_unloaded_bit = 0x40000000u;
+constexpr static uint32_t brick_requested_bit = 0x20000000u;
 
 constexpr static int brick_load_queue_size = 512;
 
