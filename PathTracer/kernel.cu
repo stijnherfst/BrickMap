@@ -73,7 +73,7 @@ enum Refl_t { DIFF,
 	Given a direction unit vector W, computes two other vectors U and V which 
 	make uvw an orthonormal basis.
 */
-//TODO(Dan): Implement Frisvad method.
+//TODO: Implement Frisvad method.
 __forceinline __device__ void computeOrthonormalBasisNaive(const glm::vec3& w, glm::vec3* u, glm::vec3* v) {
 	if (fabs(w.x) > .9) { /*If W is to close to X axis then pick Y*/
 		*u = glm::vec3{ 0.0f, 1.0f, 0.0f };
@@ -202,20 +202,6 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 		
 		ray.distance = VERY_FAR;
 		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData, camera_position);
-
-		//if (intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData, camera_position)) {
-		//	//glm::vec3 yoyo = ray.origin + ray.direction * ray.distance;
-
-		//	atomicAdd(&blit_buffer[ray.pixel_index].r, ray.distance / 10.f);
-		//	atomicAdd(&blit_buffer[ray.pixel_index].g, ray.distance / 20.f);
-		//	atomicAdd(&blit_buffer[ray.pixel_index].b, ray.distance / 30.f);
-
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].r, ray.normal.x);
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].g, ray.normal.y);
-		//	//atomicAdd(&blit_buffer[ray.pixel_index].b, ray.normal.z);
-
-		//	atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
-		//}
 	}
 }
 
@@ -248,7 +234,15 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 			// Generate new shadow ray
 			glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
 			float sunLight = dot(ray.normal, sunSampleDir);
-			//ray.direct *= glm::vec3(0.9f, 0.6f, 0.6f);
+
+			if (ray.origin.z > grid_height * 0.80f) {
+			} else if (ray.origin.z > grid_height * 0.4f) {
+				ray.direct *= glm::vec3(0.6f);
+			} else if (ray.origin.z > grid_height * 0.2f) {
+				ray.direct *= glm::vec3(0.5f, 1.f, 0.5f);
+			} else {
+				ray.direct *= glm::vec3(0.5f, 0.5f, 1.f);
+			}
 
 			// < 0.f means sun is behind the surface
 			if (sunLight > 0.f) {
@@ -292,9 +286,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 			new_frame++;
 		}
 
-		//Color is added every frame to buffer. However color can only be non-zero for sun/sky and if emmisive surface
-		//was hit.
-		//TODO(Dan): Perf increase if only add when != 0? How to interact with sky = black?
+		//Color is added every frame to buffer. However color can only be non-zero for sun/sky and if emmisive surface was hit.
 		atomicAdd(&blit_buffer[ray.pixel_index].r, color.r);
 		atomicAdd(&blit_buffer[ray.pixel_index].g, color.g);
 		atomicAdd(&blit_buffer[ray.pixel_index].b, color.b);
@@ -313,7 +305,6 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 
 		ShadowQueue ray = queue[index];
 
-		//if (!intersect_voxel_simple(ray.origin, ray.direction, sceneData, camera_position)) {
 		glm::vec3 y{};
 		float t = 0.f;
 		if (!intersect_voxel(ray.origin, ray.direction, y, t, sceneData, camera_position)) {
@@ -337,7 +328,7 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
 	glm::vec4 cl = glm::vec4(color.r, color.g, color.b, 1) / color.a;
 	cl.a = 1;
 
-	//surf2Dwrite<glm::vec4>(cl, surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
+	// Gamma correction
 	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.0f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 

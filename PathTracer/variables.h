@@ -33,7 +33,6 @@ constexpr static int lod_distance_8x8x8 = 600'000;
 // LoD distance for blocksize 2x2x2 representing 8x8x8
 constexpr static int lod_distance_2x2x2 = 100'000;
 
-
 constexpr static uint32_t brick_index_bits = 0xFFFu;
 constexpr static uint32_t brick_lod_bits = 0xFF000u;
 constexpr static uint32_t brick_loaded_bit = 0x80000000u;

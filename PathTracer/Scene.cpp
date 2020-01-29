@@ -1,7 +1,6 @@
 #include "stdafx.h"
 #include <array>
 #include <chrono>
-#include <mutex>
 #include <thread>
 
 cudaStream_t load_stream;
@@ -11,8 +10,6 @@ __forceinline unsigned int morton(unsigned int x) {
 	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
 	return x;
 }
-
-//std::mutex mtx;
 
 Scene::Scene() {
 	cuda(HostAlloc(&bricks_to_load, brick_load_queue_size * sizeof(glm::ivec3), cudaHostAllocDefault));
@@ -172,6 +169,7 @@ void Scene::process_load_queue() {
 
 	cuda(Memcpy(bricks_to_load, gpuScene.brick_load_queue, brick_to_load_count * sizeof(glm::ivec3), cudaMemcpyDeviceToHost));
 	
+	// Sorting to group them by supergrid index for optimized cudamemcpy
 	std::sort(bricks_to_load, bricks_to_load + brick_to_load_count, [](const glm::ivec3& l, const glm::ivec3& r) {
 		int supergrid_index_l = l.x / supergrid_cell_size + l.y / supergrid_cell_size * supergrid_xy + l.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
 		int supergrid_index_r = r.x / supergrid_cell_size + r.y / supergrid_cell_size * supergrid_xy + r.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
@@ -222,6 +220,7 @@ void Scene::process_load_queue() {
 			next_superindex = next_pos.x + next_pos.y * supergrid_xy + next_pos.z * supergrid_xy * supergrid_xy;
 		}
 
+		// Uploaded brick group if the next index is from a different superchunk
 		if (i + 1 == brick_to_load_count - 1 || supergrid_index != next_superindex) {
 			cuda(MemcpyAsync(t->gpu_brick_location + t->gpu_index_highest, brick_gpu_staging + stage_index - bricks_to_upload, bricks_to_upload * sizeof(Brick), cudaMemcpyKind::cudaMemcpyHostToDevice, load_stream));
 			t->gpu_index_highest += bricks_to_upload;
