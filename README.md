@@ -9,11 +9,7 @@ Since a superchunk contains 4096 bricks (16x16x16), we only need 12 bits for an 
 Unfortunately Cuda does not offer access to the hardware accelerated ASTC/DXT1 texture decompression which I could use to store colors per voxel. This would mean that I would have to write a software decompressor which would probably be a lot slower. Voxel terrain data is inherently well suited for these types of texture compression as they are often gradient like in color. Maybe some type of specialistic voxel color compression algorithm could be devised for this.
 
 16384x16384x512 (~75 billion filled voxels) and uses ~2.2GB VRAM, 30-50 fps 1920x1080
-
-[img1](http://g2f.nl/0n49y1c)
-
-[img2](http://g2f.nl/06kiadp)
-
-[img3](http://g2f.nl/0b7c70y)
-
-[img4](http://g2f.nl/06jcd80)
+![img4](http://g2f.nl/06jcd80)
+![img1](http://g2f.nl/0n49y1c)
+![img2](http://g2f.nl/06kiadp)
+![img3](http://g2f.nl/0b7c70y)
