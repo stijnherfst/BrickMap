@@ -1,5 +1,7 @@
 # BrickMap
 
+![img2](http://g2f.nl/06kiadp)
+
 The system is based on [this paper](https://dspace.library.uu.nl/handle/1874/315917) with some adjustments to reduce memory and add LoDs. One important improvement is that the paper does one allocation per "Brick" (8x8x8 voxel block) on the GPU. Instead of using pointers we can simply use indices that index into a linear block of memory. When due to the streaming system the block of memory fills up we simply double its size (allocate a bigger memory chunk and copy the old bricks). To keep the index small and further improve data locality, we divide the world in superchunks each composed of 16x16x16 normal 8x8x8 bricks which means that the maximum index value is 4095 (16x16x16) which only takes up 12 bits. The standard size of the brick storage for a superchunk is 256 * 64 bytes which should fit one surface worth of bricks (16x16). We double the storage size every time it fills up, so 256->512->1024->etc...
 
 When a ray hits a brick that has not yet been loaded on the GPU it will add the request to a request buffer. The CPU will then upload the brick to the GPU. This way only bricks that lay on the surface of a superchunk will be loaded since rays won't penetrate into the inside of a superchunk.
@@ -11,5 +13,4 @@ Unfortunately Cuda does not offer access to the hardware accelerated ASTC/DXT1 t
 16384x16384x512 (~75 billion filled voxels) and uses ~2.2GB VRAM, 30-50 fps 1920x1080
 ![img4](http://g2f.nl/06jcd80)
 ![img1](http://g2f.nl/0n49y1c)
-![img2](http://g2f.nl/06kiadp)
 ![img3](http://g2f.nl/0b7c70y)
