@@ -10,20 +10,19 @@
 /// Include <glm/gtx/type_aligned.hpp> to use the features of this extension.
 ///
 /// Defines aligned types.
-///
-/// @ref core_precision defines aligned types.
 
 #pragma once
 
 // Dependency:
 #include "../gtc/type_precision.hpp"
-
-#ifndef GLM_ENABLE_EXPERIMENTAL
-#	error "GLM: GLM_GTX_type_aligned is an experimental extension and may change in the future. Use #define GLM_ENABLE_EXPERIMENTAL before including it, if you really want to use it."
-#endif
+#include "../gtc/quaternion.hpp"
 
 #if GLM_MESSAGES == GLM_ENABLE && !defined(GLM_EXT_INCLUDED)
-#	pragma message("GLM: GLM_GTX_type_aligned extension included")
+#	ifndef GLM_ENABLE_EXPERIMENTAL
+#		pragma message("GLM: GLM_GTX_type_aligned is an experimental extension and may change in the future. Use #define GLM_ENABLE_EXPERIMENTAL before including it, if you really want to use it.")
+#	else
+#		pragma message("GLM: GLM_GTX_type_aligned extension included")
+#	endif
 #endif
 
 namespace glm
@@ -959,7 +958,7 @@ namespace glm
 
 	/// Single-qualifier floating-point aligned quaternion.
 	/// @see gtx_type_aligned
-	GLM_ALIGNED_TYPEDEF(fquat, aligned_fquat, 16);
+	GLM_ALIGNED_TYPEDEF(quat, aligned_fquat, 16);
 
 	/// Double-qualifier floating-point aligned quaternion.
 	/// @see gtx_type_aligned

@@ -1,6 +1,9 @@
 #pragma once
 
-__device__ __forceinline unsigned int morton(unsigned int x) {
+#include "gtx/vec_swizzle.hpp"
+
+	__device__ __forceinline unsigned int
+	morton(unsigned int x) {
 	x = (x ^ (x << 16)) & 0xff0000ff, x = (x ^ (x << 8)) & 0x0300f00f;
 	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
 	return x;
@@ -23,169 +26,106 @@ __device__ bool intersect_aabb_branchless2(const glm::vec3& origin, const glm::v
 __device__ inline bool intersect_byte(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, uint8_t byte) {
 	glm::ivec3 pos = origin;
 
+	glm::vec3 cb;
+	cb.x = direction.x > 0.f ? pos.x + 1 : pos.x;
+	cb.y = direction.y > 0.f ? pos.y + 1 : pos.y;
+	cb.z = direction.z > 0.f ? pos.z + 1 : pos.z;
 	glm::ivec3 out;
-	glm::ivec3 step;
-	glm::vec3 cb, tmax, tdelta;
+	out.x = direction.x > 0.f ? 2 : -1;
+	out.y = direction.y > 0.f ? 2 : -1;
+	out.z = direction.z > 0.f ? 2 : -1;
+	glm::vec3 step;
+	step.x = direction.x > 0.f ? 1.f : -1.f;
+	step.y = direction.y > 0.f ? 1.f : -1.f;
+	step.z = direction.z > 0.f ? 1.f : -1.f;
 
-	cb.x = direction.x > 0 ? pos.x + 1 : pos.x;
-	cb.y = direction.y > 0 ? pos.y + 1 : pos.y;
-	cb.z = direction.z > 0 ? pos.z + 1 : pos.z;
-	out.x = direction.x > 0 ? 2 : -1;
-	out.y = direction.y > 0 ? 2 : -1;
-	out.z = direction.z > 0 ? 2 : -1;
-	step.x = direction.x > 0 ? 1 : -1;
-	step.y = direction.y > 0 ? 1 : -1;
-	step.z = direction.z > 0 ? 1 : -1;
-
-	float rxr, ryr, rzr;
-	if (direction.x != 0) {
-		rxr = 1.0f / direction.x;
-		tmax.x = (cb.x - origin.x) * rxr;
-		tdelta.x = step.x * rxr;
-	} else
-		tmax.x = 1000000.f;
-	if (direction.y != 0) {
-		ryr = 1.0f / direction.y;
-		tmax.y = (cb.y - origin.y) * ryr;
-		tdelta.y = step.y * ryr;
-	} else
-		tmax.y = 1000000.f;
-	if (direction.z != 0) {
-		rzr = 1.0f / direction.z;
-		tmax.z = (cb.z - origin.z) * rzr;
-		tdelta.z = step.z * rzr;
-	} else
-		tmax.z = 1000000.f;
+	glm::vec3 rdinv = 1.f / direction;
+	glm::vec3 tmax;
+	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
+	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
+	tmax.z = direction.z != 0.f ? (cb.z - origin.z) * rdinv.z : 1000000.f;
+	glm::vec3 tdelta = step * rdinv;
 
 	pos = pos % 2;
 
 	distance = 0.f;
-	int smallest_component = -1;
+	int step_axis = -1;
+	glm::vec3 mask;
 	// Stepping through grid
 	while (1) {
 		if (byte & (1 << (pos.x + pos.y * 2 + pos.z * 4))) {
-			if (smallest_component > -1) {
+			if (step_axis > -1) {
 				normal = glm::vec3(0, 0, 0);
-				normal[smallest_component] = -step[smallest_component];
+				normal[step_axis] = -step[step_axis];
+				distance = tmax[step_axis] - tdelta[step_axis];
 			}
 			return true;
 		}
 
-		smallest_component = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
+		step_axis = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
+		mask.x = tmax.x < tmax.y && tmax.x < tmax.z;
+		mask.y = tmax.y <= tmax.x && tmax.y < tmax.z;
+		mask.z = tmax.z <= tmax.x && tmax.z <= tmax.y;
 
-		distance = glm::min(tmax.x, glm::min(tmax.y, tmax.z));
-
-		if (tmax.x < tmax.y) {
-			if (tmax.x < tmax.z) {
-				pos.x += step.x;
-				if (pos.x == out.x)
-					return false;
-				tmax.x += tdelta.x;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				tmax.z += tdelta.z;
-			}
-		} else {
-			if (tmax.y < tmax.z) {
-				pos.y += step.y;
-				if (pos.y == out.y)
-					return false;
-				tmax.y += tdelta.y;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				tmax.z += tdelta.z;
-			}
-		}
+		pos += mask * step;
+		if (pos[step_axis] == out[step_axis])
+			break;
+		tmax += mask * tdelta;
 	}
 	return false;
 }
 
 __device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, Brick* brick) {
 	glm::ivec3 pos = origin;
-	
+
+	glm::vec3 cb;
+	cb.x = direction.x > 0.f ? pos.x + 1 : pos.x;
+	cb.y = direction.y > 0.f ? pos.y + 1 : pos.y;
+	cb.z = direction.z > 0.f ? pos.z + 1 : pos.z;
 	glm::ivec3 out;
-	glm::ivec3 step;
-	glm::vec3 cb, tmax, tdelta;
-
-	cb.x = direction.x > 0 ? pos.x + 1 : pos.x;
-	cb.y = direction.y > 0 ? pos.y + 1 : pos.y;
-	cb.z = direction.z > 0 ? pos.z + 1 : pos.z;
-	out.x = direction.x > 0 ? brick_size : -1;
-	out.y = direction.y > 0 ? brick_size : -1;
-	out.z = direction.z > 0 ? brick_size : -1;
-	step.x = direction.x > 0 ? 1 : -1;
-	step.y = direction.y > 0 ? 1 : -1;
-	step.z = direction.z > 0 ? 1 : -1;
-
-	float rxr, ryr, rzr;
-	if (direction.x != 0) {
-		rxr = 1.0f / direction.x;
-		tmax.x = (cb.x - origin.x) * rxr;
-		tdelta.x = step.x * rxr;
-	} else
-		tmax.x = 1000000.f;
-	if (direction.y != 0) {
-		ryr = 1.0f / direction.y;
-		tmax.y = (cb.y - origin.y) * ryr;
-		tdelta.y = step.y * ryr;
-	} else
-		tmax.y = 1000000.f;
-	if (direction.z != 0) {
-		rzr = 1.0f / direction.z;
-		tmax.z = (cb.z - origin.z) * rzr;
-		tdelta.z = step.z * rzr;
-	} else
-		tmax.z = 1000000.f;
+	out.x = direction.x > 0.f ? brick_size : -1;
+	out.y = direction.y > 0.f ? brick_size : -1;
+	out.z = direction.z > 0.f ? brick_size : -1;
+	glm::vec3 step;
+	step.x = direction.x > 0.f ? 1.f : -1.f;
+	step.y = direction.y > 0.f ? 1.f : -1.f;
+	step.z = direction.z > 0.f ? 1.f : -1.f;
+	
+	glm::vec3 rdinv = 1.f / direction;
+	glm::vec3 tmax;
+	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
+	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
+	tmax.z = direction.z != 0.f ? (cb.z - origin.z) * rdinv.z : 1000000.f;
+	glm::vec3 tdelta = step * rdinv;
 
 	pos = pos % 8;
 
 	distance = 0.f;
-	int smallest_component = -1;
+	int step_axis = -1;
+	glm::vec3 mask;
 	// Stepping through grid
 	while (1) {
 		int sub_data = (pos.x + pos.y * brick_size + pos.z * brick_size * brick_size) / 32;
 		int bit = (pos.x + pos.y * brick_size + pos.z * brick_size * brick_size) % 32;
 
 		if (brick->data[sub_data] & (1 << bit)) {
-			if (smallest_component > -1) {
+			if (step_axis > -1) {
 				normal = glm::vec3(0, 0, 0);
-				normal[smallest_component] = -step[smallest_component];
+				normal[step_axis] = -step[step_axis];
+				distance = tmax[step_axis] - tdelta[step_axis];
 			}
 			return true;
 		}
-		smallest_component = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
 
-		distance = glm::min(tmax.x, glm::min(tmax.y, tmax.z));
+		step_axis = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
+		mask.x = tmax.x < tmax.y && tmax.x < tmax.z;
+		mask.y = tmax.y <= tmax.x && tmax.y < tmax.z;
+		mask.z = tmax.z <= tmax.x && tmax.z <= tmax.y;
 
-		if (tmax.x < tmax.y) {
-			if (tmax.x < tmax.z) {
-				pos.x += step.x;
-				if (pos.x == out.x)
-					return false;
-				tmax.x += tdelta.x;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				tmax.z += tdelta.z;
-			}
-		} else {
-			if (tmax.y < tmax.z) {
-				pos.y += step.y;
-				if (pos.y == out.y)
-					return false;
-				tmax.y += tdelta.y;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				tmax.z += tdelta.z;
-			}
-		}
+		pos += mask * step;
+		if (pos[step_axis] == out[step_axis])
+			break;
+		tmax += mask * tdelta;
 	}
 	return false;
 }
@@ -212,57 +152,45 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 	}
 	origin /= 8.f;
 	glm::ivec3 pos = origin;
-	glm::ivec3 out;
-	glm::ivec3 step;
-	glm::vec3 cb, tmax, tdelta;
 
 	// Needed because sometimes the AABB intersect returns true while the ray is actually outside slightly. Only happens for faces that touch the AABB sides
 	if (pos.x < 0 || pos.x >= cells || pos.y < 0 || pos.y >= cells || pos.z < 0 || pos.z >= cells_height) {
 		return false;
 	}
 
-	cb.x = direction.x > 0 ? pos.x + 1 : pos.x;
-	cb.y = direction.y > 0 ? pos.y + 1 : pos.y;
-	cb.z = direction.z > 0 ? pos.z + 1 : pos.z;
-	out.x = direction.x > 0 ? cells : -1;
-	out.y = direction.y > 0 ? cells : -1;
-	out.z = direction.z > 0 ? cells_height : -1;
-	step.x = direction.x > 0 ? 1 : -1;
-	step.y = direction.y > 0 ? 1 : -1;
-	step.z = direction.z > 0 ? 1 : -1;
+	glm::vec3 cb;
+	cb.x = direction.x > 0.f ? pos.x + 1 : pos.x;
+	cb.y = direction.y > 0.f ? pos.y + 1 : pos.y;
+	cb.z = direction.z > 0.f ? pos.z + 1 : pos.z;
+	glm::ivec3 out;
+	out.x = direction.x > 0.f ? cells : -1;
+	out.y = direction.y > 0.f ? cells : -1;
+	out.z = direction.z > 0.f ? cells_height : -1;
+	glm::vec3 step;
+	step.x = direction.x > 0.f ? 1.f : -1.f;
+	step.y = direction.y > 0.f ? 1.f : -1.f;
+	step.z = direction.z > 0.f ? 1.f : -1.f;
+	
+	glm::vec3 rdinv = 1.f / direction;
+	glm::vec3 tmax;
+	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
+	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
+	tmax.z = direction.z != 0.f ? (cb.z - origin.z) * rdinv.z : 1000000.f;
+	glm::vec3 tdelta = step * rdinv;
 
-	float rxr, ryr, rzr;
-	if (direction.x != 0) {
-		rxr = 1.0f / direction.x;
-		tmax.x = (cb.x - origin.x) * rxr;
-		tdelta.x = step.x * rxr;
-	} else
-		tmax.x = 1000000;
-	if (direction.y != 0) {
-		ryr = 1.0f / direction.y;
-		tmax.y = (cb.y - origin.y) * ryr;
-		tdelta.y = step.y * ryr;
-	} else
-		tmax.y = 1000000;
-	if (direction.z != 0) {
-		rzr = 1.0f / direction.z;
-		tmax.z = (cb.z - origin.z) * rzr;
-		tdelta.z = step.z * rzr;
-	} else
-		tmax.z = 1000000;
+	int step_axis = -1;
+	glm::vec3 mask;
 
-	float new_distance = 0.f;
-
-	int smallest_component = -1;
 	while (1) {
 		int supercell_index = pos.x / supergrid_cell_size + (pos.y / supergrid_cell_size) * supergrid_xy + (pos.z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
-		//uint32_t& index = scene.brick_grid[morton(pos.x) + (morton(pos.y) << 1) + (morton(pos.z) << 2)];
 		uint32_t& index = scene.indices[supercell_index][(pos.x % supergrid_cell_size) + (pos.y % supergrid_cell_size) * supergrid_cell_size + (pos.z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size];
 
 		if (index) {
-			if (smallest_component > -1) {
+			float new_distance = 0.f;
+			if (step_axis != -1) {
 				normal = glm::vec3(0, 0, 0);
-				normal[smallest_component] = -step[smallest_component];
+				normal[step_axis] = -step[step_axis];
+				new_distance = tmax[step_axis] - tdelta[step_axis];
 			}
 
 			glm::ivec3 difference = camera_position - pos;
@@ -306,37 +234,16 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 			}
 		}
 
-		smallest_component = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
+		step_axis = (tmax.x < tmax.y) ? ((tmax.x < tmax.z) ? 0 : 2) : ((tmax.y < tmax.z) ? 1 : 2);
 
-		if (tmax.x < tmax.y) {
-			if (tmax.x < tmax.z) {
-				pos.x += step.x;
-				if (pos.x == out.x)
-					return false;
-				new_distance = tmax.x;
-				tmax.x += tdelta.x;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				new_distance = tmax.z;
-				tmax.z += tdelta.z;
-			}
-		} else {
-			if (tmax.y < tmax.z) {
-				pos.y += step.y;
-				if (pos.y == out.y)
-					return false;
-				new_distance = tmax.y;
-				tmax.y += tdelta.y;
-			} else {
-				pos.z += step.z;
-				if (pos.z == out.z)
-					return false;
-				new_distance = tmax.z;
-				tmax.z += tdelta.z;
-			}
-		}
+		mask.x = tmax.x < tmax.y && tmax.x < tmax.z;
+		mask.y = tmax.y <= tmax.x && tmax.y < tmax.z;
+		mask.z = tmax.z <= tmax.x && tmax.z <= tmax.y;
+
+		pos += mask * step;
+		if (pos[step_axis] == out[step_axis])
+			break;
+		tmax += mask * tdelta;
 	}
 	return false;
 }

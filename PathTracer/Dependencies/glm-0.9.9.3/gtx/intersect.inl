@@ -1,5 +1,4 @@
 /// @ref gtx_intersect
-/// @file glm/gtx/intersect.inl
 
 namespace glm
 {
@@ -14,10 +13,13 @@ namespace glm
 		typename genType::value_type d = glm::dot(dir, planeNormal);
 		typename genType::value_type Epsilon = std::numeric_limits<typename genType::value_type>::epsilon();
 
-		if(d < -Epsilon)
+		if(glm::abs(d) > Epsilon)  // if dir and planeNormal are not perpendicular
 		{
-			intersectionDistance = glm::dot(planeOrig - orig, planeNormal) / d;
-			return true;
+			typename genType::value_type const tmp_intersectionDistance = 	glm::dot(planeOrig - orig, planeNormal) / d;
+			if (tmp_intersectionDistance > static_cast<typename genType::value_type>(0)) { // allow only intersections
+				intersectionDistance = tmp_intersectionDistance;
+				return true;
+			}
 		}
 
 		return false;
@@ -41,7 +43,7 @@ namespace glm
 		// if determinant is near zero, ray lies in plane of triangle
 		T const det = glm::dot(edge1, p);
 
-		vec<3, T, Q> qvec(0);
+		vec<3, T, Q> Perpendicular(0);
 
 		if(det > std::numeric_limits<T>::epsilon())
 		{
@@ -54,10 +56,10 @@ namespace glm
 				return false;
 
 			// prepare to test V parameter
-			qvec = glm::cross(dist, edge1);
+			Perpendicular = glm::cross(dist, edge1);
 
 			// calculate V parameter and test bounds
-			baryPosition.y = glm::dot(dir, qvec);
+			baryPosition.y = glm::dot(dir, Perpendicular);
 			if((baryPosition.y < static_cast<T>(0)) || ((baryPosition.x + baryPosition.y) > det))
 				return false;
 		}
@@ -72,10 +74,10 @@ namespace glm
 				return false;
 
 			// prepare to test V parameter
-			qvec = glm::cross(dist, edge1);
+			Perpendicular = glm::cross(dist, edge1);
 
 			// calculate V parameter and test bounds
-			baryPosition.y = glm::dot(dir, qvec);
+			baryPosition.y = glm::dot(dir, Perpendicular);
 			if((baryPosition.y > static_cast<T>(0)) || (baryPosition.x + baryPosition.y < det))
 				return false;
 		}
@@ -85,7 +87,7 @@ namespace glm
 		T inv_det = static_cast<T>(1) / det;
 
 		// calculate distance, ray intersects triangle
-		distance = glm::dot(edge2, qvec) * inv_det;
+		distance = glm::dot(edge2, Perpendicular) * inv_det;
 		baryPosition *= inv_det;
 
 		return true;
@@ -104,27 +106,27 @@ namespace glm
 		genType edge1 = vert1 - vert0;
 		genType edge2 = vert2 - vert0;
 
-		genType pvec = cross(dir, edge2);
+		genType Perpendicular = cross(dir, edge2);
 
-		float det = dot(edge1, pvec);
+		float det = dot(edge1, Perpendicular);
 
 		if (det > -Epsilon && det < Epsilon)
 			return false;
-		float inv_det = typename genType::value_type(1) / det;
+		typename genType::value_type inv_det = typename genType::value_type(1) / det;
 
-		genType tvec = orig - vert0;
+		genType Tengant = orig - vert0;
 
-		position.y = dot(tvec, pvec) * inv_det;
+		position.y = dot(Tengant, Perpendicular) * inv_det;
 		if (position.y < typename genType::value_type(0) || position.y > typename genType::value_type(1))
 			return false;
 
-		genType qvec = cross(tvec, edge1);
+		genType Cotengant = cross(Tengant, edge1);
 
-		position.z = dot(dir, qvec) * inv_det;
+		position.z = dot(dir, Cotengant) * inv_det;
 		if (position.z < typename genType::value_type(0) || position.y + position.z > typename genType::value_type(1))
 			return false;
 
-		position.x = dot(edge2, qvec) * inv_det;
+		position.x = dot(edge2, Cotengant) * inv_det;
 
 		return true;
 	}

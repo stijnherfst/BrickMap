@@ -11,8 +11,8 @@ constexpr static unsigned render_height = 1080;
 constexpr static int thread_count = 8;
 
 // Most other variables are calculated from this
-constexpr static int grid_size = 8192;
-constexpr static int grid_height = 512;
+constexpr static int grid_size = 16384;
+constexpr static int grid_height = 256;
 constexpr static int brick_size = 8;
 
 constexpr static int supergrid_cell_size = 16;

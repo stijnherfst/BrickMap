@@ -10,10 +10,7 @@ Unfortunately Cuda does not offer access to the hardware accelerated ASTC/DXT1 t
 
 16384x16384x512 (~75 billion filled voxels) and uses ~2.2GB VRAM, 30-50 fps 1920x1080
 
-[img1](http://g2f.nl/0n49y1c)
-
-[img2](http://g2f.nl/06kiadp)
-
+![img1](http://g2f.nl/0n49y1c)
+![img2](http://g2f.nl/06kiadp)
 [img3](http://g2f.nl/0b7c70y)
-
 [img4](http://g2f.nl/06jcd80)
