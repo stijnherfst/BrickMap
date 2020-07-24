@@ -65,7 +65,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\assimp-4.1.0\include;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <AdditionalOptions>/std:c++latest</AdditionalOptions>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -74,8 +74,8 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opengl32.lib;glu32.lib;glfw3.lib;assimp-vc140-mt.lib;zlibstaticd.lib;IrrXML.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Debug;Dependencies\assimp-4.1.0\debug;Dependencies\zlib-1.2.11\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;opengl32.lib;glu32.lib;glfw3.lib;zlibstaticd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Debug;Dependencies\zlib-1.2.11\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
@@ -120,7 +120,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\assimp-4.1.0\include;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Dependencies\glfw-3.2.1\Include;Dependencies\glad-0.1.24\include;Dependencies\glm-0.9.9.3;Dependencies\zlib-1.2.11\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/std:c++latest</AdditionalOptions>
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
@@ -130,8 +130,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glfw3.lib;assimp-vc140-mt.lib;zlibstatic.lib;IrrXML.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Release;Dependencies\assimp-4.1.0\release;Dependencies\zlib-1.2.11\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;glfw3.lib;zlibstatic.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>Dependencies\glfw-3.2.1\Release;Dependencies\zlib-1.2.11\release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>

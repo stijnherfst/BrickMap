@@ -159,14 +159,14 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 		const unsigned int x = (start_position + index) % render_width;
 		const unsigned int y = ((start_position + index) / render_width) % render_height;
 
+#if 0 //Ordinary random points
+		const float rand_point_pixelX = x - RandomFloat(seed);
+		const float rand_point_pixelY = y - RandomFloat(seed);
+#else
 		//Get random stratified points inside pixel;
 		glm::vec2 sample2D = Random2DStratifiedSample(seed);
 		const float rand_point_pixelX = x - sample2D.x;
 		const float rand_point_pixelY = y - sample2D.y;
-
-#if 0 //Ordinary random points
-		const float rand_point_pixelX = x - RandomFloat(seed);
-		const float rand_point_pixelY = y - RandomFloat(seed);
 #endif
 
 		const float normalized_i = (rand_point_pixelX / (float)render_width) - 0.5f;
@@ -186,7 +186,7 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 
 		glm::vec3 direction = glm::normalize(convergencePoint - newOrigin);
 
-		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1, 1, 1 }, { 0, 0, 0 }, 0, 0, 0, y * render_width + x };
+		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1.f, 1.f, 1.f }, { 0.f, 0.f, 0.f }, 0.f, 0, 0, y * render_width + x };
 	}
 }
 
@@ -216,13 +216,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 			return;
 		}
 
-		int new_frame = 0;
 		RayQueue ray = ray_buffer[index];
-
-		//Each iteration we add color to the blit_buffer.
-		//Color can be non-zero if sun/sky or we're counting emisivity for different objects.
-		glm::vec3 color = glm::vec3(0.f);
-		glm::vec3 object_color;
 		unsigned int seed = (frame * ray.pixel_index * 147565741) * 720898027 * index;
 		int reflection_type = DIFF;
 
@@ -231,23 +225,25 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 			//Prevent self-intersection
 			ray.origin += ray.normal * 2.f * epsilon;
 
+
+			glm::vec3 color(1.f);
+			if (ray.origin.z > grid_height * 0.80f) {
+			} else if (ray.origin.z > grid_height * 0.4f) {
+				color *= glm::vec3(0.6f);
+			} else if (ray.origin.z > grid_height * 0.2f) {
+				color *= glm::vec3(0.5f, 1.f, 0.5f);
+			} else {
+				color *= glm::vec3(0.5f, 0.5f, 1.f);
+			}
+
+			ray.throughput *= color;
+
 			// Generate new shadow ray
 			glm::vec3 sunSampleDir = getConeSample(sunDirection, 1.0f - sunAngularDiameterCos, seed);
 			float sunLight = dot(ray.normal, sunSampleDir);
-
-			if (ray.origin.z > grid_height * 0.80f) {
-			} else if (ray.origin.z > grid_height * 0.4f) {
-				ray.direct *= glm::vec3(0.6f);
-			} else if (ray.origin.z > grid_height * 0.2f) {
-				ray.direct *= glm::vec3(0.5f, 1.f, 0.5f);
-			} else {
-				ray.direct *= glm::vec3(0.5f, 0.5f, 1.f);
-			}
-
-			// < 0.f means sun is behind the surface
-			if (sunLight > 0.f) {
+			if (sunLight > 0.f) { // < 0.f means sun is behind the surface
 				unsigned shadow_index = atomicAdd(&shadow_ray_cnt, 1);
-				shadowQueue[shadow_index] = { ray.origin, sunSampleDir, 2.0f * ray.direct * (sun(sunSampleDir) * sunLight * 1E-5f), ray.pixel_index };
+				shadowQueue[shadow_index] = { ray.origin, sunSampleDir, ray.throughput * sun(sunSampleDir) * sunLight * 1E-5f, ray.pixel_index };
 			}
 
 			if (ray.bounces < MAX_BOUNCES) {
@@ -266,31 +262,33 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 				computeOrthonormalBasisNaive(ray.normal, &u, &v);
 				// Get sample on hemisphere
 				ray.direction = glm::normalize(u * cos(r1) * r2s + v * sin(r1) * r2s + ray.normal * sqrt(1 - r2));
-			}
-			//Russian roullete
-			float p = glm::min(1.0f, glm::max(ray.direct.z, glm::max(ray.direct.x, ray.direct.y)));
-			if (ray.bounces < MAX_BOUNCES && p > (0 + epsilon) && RandomFloat(seed) <= p) {
-				//Add rays into the next ray_buffer to be processed next frame
 				ray.bounces++;
-				ray.direct *= 1.0f / p;
-
 				unsigned primary_index = atomicAdd(&primary_ray_cnt, 1);
 				ray_buffer_next[primary_index] = ray;
-			} else { // MAX BOUNCES
-				new_frame++;
+			} else {
+				atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 			}
+			////Russian roullete
+			//float p = glm::min(1.0f, glm::max(ray.direct.z, glm::max(ray.direct.x, ray.direct.y)));
+			//if (ray.bounces < MAX_BOUNCES && p > (0.f + epsilon) && RandomFloat(seed) <= p) {
+			//	//Add rays into the next ray_buffer to be processed next frame
+			//	ray.bounces++;
+			//	ray.direct *= 1.0f / p;
+
+			//	unsigned primary_index = atomicAdd(&primary_ray_cnt, 1);
+			//	ray_buffer_next[primary_index] = ray;
+			//} else { // MAX BOUNCES
+			//	new_frame += 1.f;
+			//}
 
 		} else { //NOTHING HIT
 			// Don't generate new extended ray. Directly add emmisivity of sun/sky.
-			color += ray.direct * (ray.bounces == 0 ? sunsky(ray.direction) : sky(ray.direction));
-			new_frame++;
+			glm::vec3 color = ray.throughput * (ray.bounces == 0 ? sunsky(ray.direction) : sky(ray.direction));
+			atomicAdd(&blit_buffer[ray.pixel_index].r, color.r);
+			atomicAdd(&blit_buffer[ray.pixel_index].g, color.g);
+			atomicAdd(&blit_buffer[ray.pixel_index].b, color.b);
+			atomicAdd(&blit_buffer[ray.pixel_index].a, 1.f);
 		}
-
-		//Color is added every frame to buffer. However color can only be non-zero for sun/sky and if emmisive surface was hit.
-		atomicAdd(&blit_buffer[ray.pixel_index].r, color.r);
-		atomicAdd(&blit_buffer[ray.pixel_index].g, color.g);
-		atomicAdd(&blit_buffer[ray.pixel_index].b, color.b);
-		atomicAdd(&blit_buffer[ray.pixel_index].a, new_frame);
 	}
 }
 
@@ -325,11 +323,12 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
 
 	const int index = y * render_width + x;
 	glm::vec4 color = blit_buffer[index];
-	glm::vec4 cl = glm::vec4(color.r, color.g, color.b, 1) / color.a;
-	cl.a = 1;
+	glm::vec4 cl = color / color.a;
+	//glm::vec4 cl = glm::vec4(color.r, color.g, color.b, 1) / color.a;
+	cl.a = 1.f;
 
 	// Gamma correction
-	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.0f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
+	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 
 cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene::GPUScene sceneData, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
@@ -371,32 +370,32 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 
 	if (reset_buffer) {
 		reset_buffer = false;
-		cudaMemsetAsync(blit_buffer, 0, render_width * render_height * sizeof(float4), load_stream);
+		cudaMemsetAsync(blit_buffer, 0, render_width * render_height * sizeof(glm::vec4), load_stream);
 		
 		int new_value = 0;
 		cuda(MemcpyToSymbolAsync(primary_ray_cnt, &new_value, sizeof(int), 0, cudaMemcpyHostToDevice, kernel_stream));
 	}
 
-	primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
-	set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
-	cudaStreamSynchronize(load_stream);
-	extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
-	shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-	connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
+	for (int i = 0; i < 4; i++) {
+		primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
+		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
+		cudaStreamSynchronize(load_stream);
+		extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
+		shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
+		if (frame == UINT_MAX) // Happens about once every 133 years at 60 fps
+			frame = 0;
+
+		frame++;
+		connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
+		std::swap(ray_buffer, ray_buffer_next);
+	}
 
 	dim3 threads = dim3(16, 16, 1);
-	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y, 1);
+	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y + 1, 1);
 	blit_onto_framebuffer<<<blocks, threads, 0, kernel_stream>>>(blit_buffer);
 
 	cuda(DeviceSynchronize());
 
-	//Frame is used as XORSHIFT seed, but we must ensure it's not 0
-	if (frame == UINT_MAX)
-		frame = 0;
-
-	frame++;
-
-	//hold_frame++;
 	last_pos = camera.position;
 	last_dir = camera.direction;
 	last_focaldistance = camera.focalDistance;

@@ -2,8 +2,7 @@
 
 #include "gtx/vec_swizzle.hpp"
 
-	__device__ __forceinline unsigned int
-	morton(unsigned int x) {
+__device__ __forceinline unsigned int morton(unsigned int x) {
 	x = (x ^ (x << 16)) & 0xff0000ff, x = (x ^ (x << 8)) & 0x0300f00f;
 	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
 	return x;
@@ -182,6 +181,8 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, glm::vec3 direction, gl
 	glm::vec3 mask;
 
 	while (1) {
+		//unsigned int supercell_index = morton(pos.x / supergrid_cell_size) + (morton(pos.y / supergrid_cell_size) << 1) + (morton(pos.z / supergrid_cell_size) << 2);
+
 		int supercell_index = pos.x / supergrid_cell_size + (pos.y / supergrid_cell_size) * supergrid_xy + (pos.z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
 		uint32_t& index = scene.indices[supercell_index][(pos.x % supergrid_cell_size) + (pos.y % supergrid_cell_size) * supergrid_cell_size + (pos.z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size];
 

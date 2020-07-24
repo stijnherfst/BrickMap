@@ -5,10 +5,30 @@
 
 cudaStream_t load_stream;
 
+
+//#include <immintrin.h>
+//#include <stdint.h>
+//
+//// on GCC, compile with option -mbmi2, requires Haswell or better.
+//
+//uint64_t xy_to_morton(uint32_t x, uint32_t y) {
+//	return _pdep_u32(x, 0x55555555) | _pdep_u32(y, 0xaaaaaaaa);
+//}
+//
+//void morton_to_xy(uint64_t m, uint32_t* x, uint32_t* y) {
+//	*x = _pext_u64(m, 0x5555555555555555);
+//	*y = _pext_u64(m, 0xaaaaaaaaaaaaaaaa);
+//}
+
 __forceinline unsigned int morton(unsigned int x) {
 	x = (x ^ (x << 16)) & 0xff0000ff, x = (x ^ (x << 8)) & 0x0300f00f;
 	x = (x ^ (x << 4)) & 0x030c30c3, x = (x ^ (x << 2)) & 0x09249249;
 	return x;
+}
+
+
+uint32_t MortonEncode3(uint32_t x, uint32_t y, uint32_t z) {
+	return _pdep_u32(z, 0x24924924) | _pdep_u32(y, 0x12492492) | _pdep_u32(x, 0x09249249);
 }
 
 Scene::Scene() {
@@ -33,7 +53,10 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 
 	for (int y = 0; y < supergrid_cell_size * brick_size; y++) {
 		for (int x = 0; x < supergrid_cell_size * brick_size; x++) {
-			float h = noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f) * (grid_height / 2.f) + grid_height / 2.f;
+			//float h = 1 - std::abs(noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f));
+			float h = noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f);
+			h *= grid_height / 2.f; 
+			h += grid_height / 2.f;
 			heights.push_back(h);
 		}
 	}
@@ -87,19 +110,25 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 			}
 		}
 	}
+
+	auto t = morton(start_x);
+	//unsigned int supercell_index = morton(start_x) + (morton(start_y) << 1) + (morton(start_z) << 2);
+	//uint32_t supercell_index = MortonEncode3(start_x, start_y, start_z);
 	supergrid[start_x + start_y * supergrid_xy + start_z * supergrid_xy * supergrid_xy] = std::move(supercell);
+	//supergrid[supercell_index] = std::move(supercell);
 	//FastNoiseSIMD::FreeNoiseSet(noiseSet);
 }
 
 void Scene::generate() {
 	auto begin = std::chrono::steady_clock::now();
 
-	std::array<std::thread, thread_count> threads;
+	const int thread_count = std::thread::hardware_concurrency();
+	std::vector<std::thread> threads(thread_count);
 
 	supergrid.resize(supergrid_z * supergrid_xy * supergrid_xy);
 
 	for (int i = 0; i < thread_count; i++) {
-		threads[i] = std::thread([i, this]() {
+		threads[i] = std::thread([i, thread_count, this]() {
 			for (int x = i * (supergrid_xy / thread_count); x < (i + 1) * (supergrid_xy / thread_count); x++) {
 				for (int y = 0; y < supergrid_xy; y++) {
 					for (int z = 0; z < supergrid_z; z++) {
@@ -183,7 +212,8 @@ void Scene::process_load_queue() {
 	for (int i = 0; i < brick_to_load_count; i++) {
 		const glm::ivec3& pos = bricks_to_load[i];
 		int supergrid_index = pos.x / supergrid_cell_size + pos.y / supergrid_cell_size * supergrid_xy + pos.z / supergrid_cell_size * supergrid_xy * supergrid_xy;
-	
+		//unsigned int supergrid_index = morton(pos.x / supergrid_cell_size) + (morton(pos.y / supergrid_cell_size) << 1) + (morton(pos.z / supergrid_cell_size) << 2);
+		//uint32_t supergrid_index = MortonEncode3(pos.x / supergrid_cell_size, pos.y / supergrid_cell_size, pos.z / supergrid_cell_size);
 		auto& t = supergrid[supergrid_index];
 
 		if ((t->gpu_index_highest + bricks_to_upload + 1) == t->gpu_count) {

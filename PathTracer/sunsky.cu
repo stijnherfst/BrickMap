@@ -167,8 +167,7 @@ __device__ glm::vec3 ortho(glm::vec3 v) {
 
 __device__ float RandomFloat2(unsigned int& seed);
 
-__device__ glm::vec3 getConeSample(glm::vec3 dir, float extent,
-								   unsigned int& seed) {
+__device__ glm::vec3 getConeSample(glm::vec3 dir, float extent, unsigned int& seed) {
 	// Create orthogonal vector (fails for z,y = 0)
 	dir = normalize(dir);
 	glm::vec3 o1 = glm::normalize(ortho(dir));
