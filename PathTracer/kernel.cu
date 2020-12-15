@@ -139,8 +139,20 @@ __global__ void set_wavefront_globals() {
 	raynr_connect = 0;
 }
 
+__global__ void upload(Scene::GPUScene scene) {
+	const int brick_index = threadIdx.x;
+
+	const glm::ivec3 pos = scene.brick_load_queue[brick_index];
+
+	const int supercell_index = pos.x / supergrid_cell_size + (pos.y / supergrid_cell_size) * supergrid_xy + (pos.z / supergrid_cell_size) * supergrid_xy * supergrid_xy;
+	const uint32_t indices_index = (pos.x % supergrid_cell_size) + (pos.y % supergrid_cell_size) * supergrid_cell_size + (pos.z % supergrid_cell_size) * supergrid_cell_size * supergrid_cell_size;
+
+	scene.bricks[supercell_index][scene.indices_queue[brick_index] & brick_index_bits] = scene.bricks_queue[brick_index];
+	scene.indices[supercell_index][indices_index] = scene.indices_queue[brick_index];
+}
+
 /// Generate primary rays. Fill ray_buffer up till max length.
-__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius, Scene::GPUScene sceneData, glm::vec4* blit_buffer) {
+__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius, Scene::GPUScene scene, glm::vec4* blit_buffer) {
 
 	//Fill ray buffer up to ray_queue_buffer_size.
 	while (true) {
@@ -187,11 +199,13 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 		glm::vec3 direction = glm::normalize(convergencePoint - newOrigin);
 
 		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1.f, 1.f, 1.f }, { 0.f, 0.f, 0.f }, 0.f, 0, 0, y * render_width + x };
+
+		RayQueue& ray = ray_buffer[ray_index_buffer];
 	}
 }
 
 /// Advance the ray segments once
-__global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int seed, glm::ivec3 camera_position) {
+__global__ void extend(RayQueue* ray_buffer, Scene::GPUScene scene, glm::ivec3 camera_position) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_extend, 1);
 
@@ -201,13 +215,13 @@ __global__ void extend(RayQueue* ray_buffer, Scene::GPUScene sceneData, glm::vec
 		RayQueue& ray = ray_buffer[index];
 		
 		ray.distance = VERY_FAR;
-		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, sceneData, camera_position);
+		intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, scene, camera_position);
 	}
 }
 
 /// Process collisions and spawn extension and shadow rays.
 /// Rays that continue get placed in ray_buffer_next to be processed next frame
-__global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadowQueue, Scene::GPUScene sceneData, glm::vec4* blit_buffer, unsigned int frame) {
+__global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadowQueue, Scene::GPUScene scene, glm::vec4* blit_buffer, unsigned int frame) {
 
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_shade, 1);
@@ -293,7 +307,7 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 }
 
 /// Proccess shadow rays
-__global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPUScene sceneData, glm::vec4* blit_buffer, glm::ivec3 camera_position) {
+__global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPUScene scene, glm::vec4* blit_buffer, glm::ivec3 camera_position) {
 	while (true) {
 		const unsigned int index = atomicAdd(&raynr_connect, 1);
 
@@ -305,7 +319,7 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 
 		glm::vec3 y{};
 		float t = 0.f;
-		if (!intersect_voxel(ray.origin, ray.direction, y, t, sceneData, camera_position)) {
+		if (!intersect_voxel(ray.origin, ray.direction, y, t, scene, camera_position)) {
 			atomicAdd(&blit_buffer[ray.pixel_index].r, ray.color.r);
 			atomicAdd(&blit_buffer[ray.pixel_index].g, ray.color.g);
 			atomicAdd(&blit_buffer[ray.pixel_index].b, ray.color.b);
@@ -331,7 +345,7 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
 	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 
-cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene::GPUScene sceneData, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
+cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene::GPUScene scene, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
 	static bool first_time = true;
 	static bool reset_buffer = false;
 	static unsigned int frame = 1;
@@ -376,23 +390,32 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 		cuda(MemcpyToSymbolAsync(primary_ray_cnt, &new_value, sizeof(int), 0, cudaMemcpyHostToDevice, kernel_stream));
 	}
 
-	for (int i = 0; i < 4; i++) {
-		primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, sceneData, blit_buffer);
-		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
-		cudaStreamSynchronize(load_stream);
-		extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, sceneData, blit_buffer, frame, camera.position / 8.f);
-		shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, sceneData, blit_buffer, frame);
-		if (frame == UINT_MAX) // Happens about once every 133 years at 60 fps
-			frame = 0;
 
+	//for (int i = 0; i < 4; i++) {
+		uint32_t brick_to_load_count = 0;
+		cuda(Memcpy(&brick_to_load_count, scene.brick_load_queue_count, sizeof(uint32_t), cudaMemcpyDeviceToHost));
+		brick_to_load_count = std::min(static_cast<uint32_t>(brick_load_queue_size), brick_to_load_count);
+
+		if (brick_to_load_count > 0) {
+			upload<<<1, brick_to_load_count>>>(scene);
+			cuda(Memset(scene.brick_load_queue_count, 0, 4));
+		}
+
+		primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, scene, blit_buffer);
+		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
+		extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, scene, camera.position / 8.f);
+		shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, scene, blit_buffer, frame);
+		connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, scene, blit_buffer, camera.position / 8.f);
+
+		//std::swap(ray_buffer, ray_buffer_next);
 		frame++;
-		connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, sceneData, blit_buffer, camera.position / 8.f);
-		std::swap(ray_buffer, ray_buffer_next);
-	}
+	//}
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y + 1, 1);
 	blit_onto_framebuffer<<<blocks, threads, 0, kernel_stream>>>(blit_buffer);
+
+
 
 	cuda(DeviceSynchronize());
 

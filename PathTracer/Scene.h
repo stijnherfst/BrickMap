@@ -11,6 +11,9 @@ public:
 		Brick** bricks;
 		glm::ivec3* brick_load_queue;
 		uint32_t* brick_load_queue_count;
+
+		Brick* bricks_queue;
+		uint32_t* indices_queue;
 	};
 
 	GPUScene gpuScene;
