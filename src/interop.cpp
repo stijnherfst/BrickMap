@@ -41,6 +41,12 @@ cudaError cuda_interop::set_size(const int width, const int height) {
 	// get CUDA Array refernces
 	cuda_err = cuda(GraphicsSubResourceGetMappedArray(&ca, cgr, 0, 0));
 
+	memset(&viewCudaArrayResourceDesc, 0, sizeof(viewCudaArrayResourceDesc));
+	viewCudaArrayResourceDesc.resType = cudaResourceTypeArray;
+	viewCudaArrayResourceDesc.res.array.array = ca;
+
+	cuda(CreateSurfaceObject(&surf, &viewCudaArrayResourceDesc));
+
 	// unmap graphics resources
 	cuda_err = cuda(GraphicsUnmapResources(1, &cgr, 0));
 

@@ -5,14 +5,13 @@
 #include "cuda_surface_types.h"
 #include "device_launch_parameters.h"
 #include "surface_functions.h"
-
-#include "cuda_definitions.h"
+#include <vector_types.h>
+#include <cuda/std/bit>
+#include <state.h>
 
 constexpr float VERY_FAR = 1e20f;
 constexpr int MAX_BOUNCES = 3;
 
-surface<void, cudaSurfaceType2D> surf;
-texture<float, cudaTextureTypeCubemap> skybox;
 cudaStream_t kernel_stream;
 
 //"Xorshift RNGs" by George Marsaglia
@@ -120,7 +119,7 @@ __device__ unsigned int raynr_connect = 0;
 __device__ unsigned int shadow_ray_cnt = 0;
 
 ///Kernel should be called after primary ray generation but before other wavefront steps.
-__global__ void set_wavefront_globals() {
+__global__ void set_wavefront_globals(uint32_t render_width, uint32_t render_height) {
 
 	//Get how many rays we created last generation step.
 	const unsigned int progress_last_frame = ray_queue_buffer_size - primary_ray_cnt;
@@ -152,7 +151,7 @@ __global__ void upload(Scene::GPUScene scene) {
 }
 
 /// Generate primary rays. Fill ray_buffer up till max length.
-__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius, Scene::GPUScene scene, glm::vec4* blit_buffer, glm::ivec3 camera_position) {
+__global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::vec3 camera_up, glm::vec3 camera_direction, glm::vec3 O, unsigned int frame, float focalDistance, float lens_radius, Scene::GPUScene scene, glm::vec4* blit_buffer, glm::ivec3 camera_position, uint32_t render_width, uint32_t render_height) {
 
 	//Fill ray buffer up to ray_queue_buffer_size.
 	while (true) {
@@ -200,7 +199,7 @@ __global__ void primary_rays(RayQueue* ray_buffer, glm::vec3 camera_right, glm::
 
 		ray_buffer[ray_index_buffer] = { newOrigin, direction, { 1.f, 1.f, 1.f }, { 0.f, 0.f, 0.f }, 0.f, 0, 0, y * render_width + x };
 
-		RayQueue& ray = ray_buffer[ray_index_buffer];
+		//RayQueue& ray = ray_buffer[ray_index_buffer];
 
 		//ray.distance = VERY_FAR;
 		//bool intersect = intersect_voxel(ray.origin, ray.direction, ray.normal, ray.distance, scene, camera_position);
@@ -260,14 +259,14 @@ __global__ void __launch_bounds__(128) shade(RayQueue* ray_buffer, RayQueue* ray
 
 
 			glm::vec3 color(1.f);
-			if (ray.origin.z > grid_height * 0.80f) {
+			/*if (ray.origin.z > grid_height * 0.80f) {
 			} else if (ray.origin.z > grid_height * 0.4f) {
 				color *= glm::vec3(0.6f);
 			} else if (ray.origin.z > grid_height * 0.2f) {
 				color *= glm::vec3(0.5f, 1.f, 0.5f);
 			} else {
 				color *= glm::vec3(0.5f, 0.5f, 1.f);
-			}
+			}*/
 
 			ray.throughput *= color;
 
@@ -346,7 +345,7 @@ __global__ void __launch_bounds__(128, 8) connect(ShadowQueue* queue, Scene::GPU
 	}
 }
 
-__global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
+__global__ void blit_onto_framebuffer(glm::vec4* blit_buffer, cudaSurfaceObject_t texture, uint32_t render_width, uint32_t render_height) {
 	const int x = blockIdx.x * blockDim.x + threadIdx.x;
 	const int y = blockIdx.y * blockDim.y + threadIdx.y;
 
@@ -357,14 +356,14 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer) {
 	const int index = y * render_width + x;
 	glm::vec4 color = blit_buffer[index];
 	glm::vec4 cl = color / color.a;
-	//glm::vec4 cl = glm::vec4(color.r, color.g, color.b, 1) / color.a;
 	cl.a = 1.f;
 
 	// Gamma correction
-	surf2Dwrite<glm::vec4>(glm::pow(cl, glm::vec4(1.f / 2.2f)), surf, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
+	glm::vec4 gamma_corrected = glm::pow(cl, glm::vec4(1.f / 2.2f));
+	surf2Dwrite(cuda::std::bit_cast<float4>(gamma_corrected), texture, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 
-cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene::GPUScene scene, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
+cudaError launch_kernels(State& state, cudaSurfaceObject_t surf, glm::vec4* blit_buffer, Scene::GPUScene scene, RayQueue* ray_buffer, RayQueue* ray_buffer_next, ShadowQueue* shadow_queue) {
 	static bool first_time = true;
 	static bool reset_buffer = false;
 	static unsigned int frame = 1;
@@ -382,13 +381,7 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	static float last_focaldistance = 1;
 	static float last_lensradius = 0.02f;
 
-	cuda_err = cuda(BindSurfaceToArray(surf, array));
-
-	if (cuda_err) {
-		return cuda_err;
-	}
-
-	const glm::vec3 camera_right = glm::normalize(glm::cross(camera.direction, camera.up)) * 1.5f * ((float)render_width / render_height);
+	const glm::vec3 camera_right = glm::normalize(glm::cross(camera.direction, camera.up)) * 1.5f * ((float)state.screen_width / state.screen_height);
 	const glm::vec3 camera_up = glm::normalize(glm::cross(camera_right, camera.direction)) * 1.5f;
 
 	reset_buffer = last_pos != camera.position || last_dir != camera.direction || last_focaldistance != camera.focalDistance || camera.lensRadius != last_lensradius;
@@ -403,7 +396,7 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 
 	if (reset_buffer) {
 		reset_buffer = false;
-		cudaMemsetAsync(blit_buffer, 0, render_width * render_height * sizeof(glm::vec4), load_stream);
+		cudaMemsetAsync(blit_buffer, 0, state.screen_width * state.screen_height * sizeof(glm::vec4), load_stream);
 		
 		int new_value = 0;
 		cuda(MemcpyToSymbolAsync(primary_ray_cnt, &new_value, sizeof(int), 0, cudaMemcpyHostToDevice, kernel_stream));
@@ -420,8 +413,8 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 			cuda(Memset(scene.brick_load_queue_count, 0, 4));
 		}
 
-		primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, scene, blit_buffer, camera.position);
-		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>();
+		primary_rays<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, camera_right, camera_up, camera.direction, camera.position, frame, camera.focalDistance, camera.lensRadius, scene, blit_buffer, camera.position, state.screen_width, state.screen_height);
+		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>(state.screen_width, state.screen_height);
 		extend<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, scene, camera.position / 8.f);
 		shade<<<sm_cores * 8, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, scene, blit_buffer, frame);
 		connect<<<sm_cores * 8, 128, 0, kernel_stream>>>(shadow_queue, scene, blit_buffer, camera.position / 8.f);
@@ -431,9 +424,8 @@ cudaError launch_kernels(cudaArray_const_t array, glm::vec4* blit_buffer, Scene:
 	//}
 
 	dim3 threads = dim3(16, 16, 1);
-	dim3 blocks = dim3(render_width / threads.x, render_height / threads.y + 1, 1);
-	blit_onto_framebuffer<<<blocks, threads, 0, kernel_stream>>>(blit_buffer);
-
+		dim3 blocks = dim3(state.screen_width / threads.x, state.screen_height / threads.y + 1, 1);
+	blit_onto_framebuffer<<<blocks, threads, 0, kernel_stream>>>(blit_buffer, surf, state.screen_width, state.screen_height);
 
 
 	cuda(DeviceSynchronize());

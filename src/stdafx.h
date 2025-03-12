@@ -18,10 +18,6 @@
 #include "cuda.h"
 #include <cuda_runtime.h>
 
-//#define GLM_FORCE_CUDA
-//#define GLM_FORCE_PURE
-#define GLM_FORCE_CXX17
-
 #include "glm/glm.hpp"
 #include "glm/gtc/integer.hpp" 
 

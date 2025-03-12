@@ -10,7 +10,7 @@ struct Camera {
 	bool enableDoF = false;
 
 	double fov = 70;
-	double aspect_ratio = render_width / render_height;
+	double aspect_ratio = 1.5;
 	double fov_rad = (pi / 180.0) * static_cast<double>(fov); // Need radians
 	double tan_height = 2.0 * tan(fov_rad * 0.5);
 

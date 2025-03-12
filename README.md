@@ -15,3 +15,13 @@ Unfortunately Cuda does not offer access to the hardware accelerated ASTC/DXT1 t
 ![img4](screenshots/d.png)
 ![img5](screenshots/e.png)
 ![img6](screenshots/f.png)
+
+## Build Instructions
+
+1. Clone [vcpkg](https://github.com/microsoft/vcpkg) somewhere central (eg. "C:/")
+`git clone https://github.com/Microsoft/vcpkg.git`
+2. Run `vcpkg/bootstrap-vcpkg.bat` or `vcpkg/bootstrap-vcpkg.sh`
+3. Add an environment variable to your system:
+- `VCPKG_ROOT`: the location where vcpkg is installed (e.g. "C:\vcpkg")
+4. Open with Visual Studio (folder mode) and hit compile or `cmake --build --preset Release`
+5. Dependencies will be automatically compiled, might take a minute or two

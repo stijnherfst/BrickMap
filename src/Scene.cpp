@@ -49,10 +49,10 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 
 	for (int y = 0; y < supergrid_cell_size * brick_size; y++) {
 		for (int x = 0; x < supergrid_cell_size * brick_size; x++) {
-			float h = 1 - std::abs(noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f));
-			//float h = noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f);
-			h *= grid_height;//	/ 2.f; 
-			//h += grid_height / 2.f;
+			//float h = 1 - std::abs(noise.fractal(7, (start_x * supergrid_cell_size * brick_size + x) / 1024.f, (start_y * supergrid_cell_size * brick_size + y) / 1024.f));
+			float h = noise.fractal(8, (start_x * supergrid_cell_size * brick_size + x) / 2048.f, (start_y * supergrid_cell_size * brick_size + y) / 2048.f);
+			h *= grid_height	/ 2.f; 
+			h += grid_height / 2.f;
 			heights.push_back(h);
 		}
 	}
@@ -118,19 +118,26 @@ void Scene::generate_supercell(int start_x, int start_y, int start_z) {
 void Scene::generate() {
 	auto begin = std::chrono::steady_clock::now();
 
-	const int thread_count = std::thread::hardware_concurrency();
+	const uint32_t supergrid_count = supergrid_z * supergrid_xy * supergrid_xy;
+	supergrid.resize(supergrid_count);
+
+	const uint32_t thread_count = std::min(supergrid_count, std::thread::hardware_concurrency());
 	std::vector<std::thread> threads(thread_count);
 
-	supergrid.resize(supergrid_z * supergrid_xy * supergrid_xy);
-
+	std::atomic<uint32_t> grids_generated = 0;
 	for (int i = 0; i < thread_count; i++) {
-		threads[i] = std::thread([i, thread_count, this]() {
-			for (int x = i * (supergrid_xy / thread_count); x < (i + 1) * (supergrid_xy / thread_count); x++) {
-				for (int y = 0; y < supergrid_xy; y++) {
-					for (int z = 0; z < supergrid_z; z++) {
-						generate_supercell(x, y, z);
-					}
+		threads[i] = std::thread([i, thread_count, this, &grids_generated]() {
+			while (true) {
+				auto index = grids_generated.fetch_add(1);
+				if (index >= supergrid_count) {
+					return;
 				}
+
+				generate_supercell(
+					index % supergrid_xy,
+					index / supergrid_xy % supergrid_xy,
+					index / supergrid_xy / supergrid_xy
+				);
 			}
 		});
 	}

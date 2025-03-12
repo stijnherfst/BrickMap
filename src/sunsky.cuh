@@ -19,7 +19,6 @@
 //// where it was MIT licensed:
 //// https://github.com/SimonWallner/kocmoc-demo/blob/RTVIS/README.rst
 //// Heavily altered by me
-
 #pragma once
 
 // Angular sun size - physical sun is 0.53 degrees

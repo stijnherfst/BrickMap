@@ -1,5 +1,6 @@
 #pragma once
 
+#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/vec_swizzle.hpp"
 
 __device__ __forceinline unsigned int morton(unsigned int x) {
@@ -23,7 +24,7 @@ __device__ bool intersect_aabb_branchless2(const glm::vec3& origin, const glm::v
 }
 
 __device__ inline bool intersect_byte(glm::vec3 origin, glm::vec3 direction, glm::vec3& normal, float& distance, uint8_t byte) {
-	glm::ivec3 pos = origin;
+	glm::ivec3 pos = origin; // should be glm::floor()?
 
 	glm::vec3 cb;
 	cb.x = direction.x > 0.f ? pos.x + 1 : pos.x;
@@ -33,12 +34,13 @@ __device__ inline bool intersect_byte(glm::vec3 origin, glm::vec3 direction, glm
 	out.x = direction.x > 0.f ? 2 : -1;
 	out.y = direction.y > 0.f ? 2 : -1;
 	out.z = direction.z > 0.f ? 2 : -1;
-	glm::vec3 step;
-	step.x = direction.x > 0.f ? 1.f : -1.f;
-	step.y = direction.y > 0.f ? 1.f : -1.f;
-	step.z = direction.z > 0.f ? 1.f : -1.f;
+	glm::vec3 step = glm::sign(direction);
 
 	glm::vec3 rdinv = 1.f / direction;
+	rdinv.x = direction.x == 0.0f ? 0.0 : rdinv.x;
+	rdinv.y = direction.y == 0.0f ? 0.0 : rdinv.y;
+	rdinv.z = direction.z == 0.0f ? 0.0 : rdinv.z;
+
 	glm::vec3 tmax;
 	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
 	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
@@ -85,12 +87,13 @@ __device__ inline bool intersect_brick(glm::vec3 origin, glm::vec3 direction, gl
 	out.x = direction.x > 0.f ? brick_size : -1;
 	out.y = direction.y > 0.f ? brick_size : -1;
 	out.z = direction.z > 0.f ? brick_size : -1;
-	glm::vec3 step;
-	step.x = direction.x > 0.f ? 1.f : -1.f;
-	step.y = direction.y > 0.f ? 1.f : -1.f;
-	step.z = direction.z > 0.f ? 1.f : -1.f;
+	glm::vec3 step = glm::sign(direction);
 	
 	glm::vec3 rdinv = 1.f / direction;
+	rdinv.x = direction.x == 0.0f ? 0.0 : rdinv.x;
+	rdinv.y = direction.y == 0.0f ? 0.0 : rdinv.y;
+	rdinv.z = direction.z == 0.0f ? 0.0 : rdinv.z;
+
 	glm::vec3 tmax;
 	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
 	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
@@ -167,16 +170,19 @@ __device__ inline bool intersect_voxel(glm::vec3 origin, const glm::vec3 directi
 	out.x = direction.x > 0.f ? cells : -1;
 	out.y = direction.y > 0.f ? cells : -1;
 	out.z = direction.z > 0.f ? cells_height : -1;
-	glm::vec3 step;
-	step.x = direction.x > 0.f ? 1.f : -1.f;
-	step.y = direction.y > 0.f ? 1.f : -1.f;
-	step.z = direction.z > 0.f ? 1.f : -1.f;
+	glm::vec3 step = glm::sign(direction);
 	
+	// Produces INFINITY when a direction is zero
 	glm::vec3 rdinv = 1.f / direction;
+	rdinv.x = direction.x == 0.0f ? 0.0 : rdinv.x;
+	rdinv.y = direction.y == 0.0f ? 0.0 : rdinv.y;
+	rdinv.z = direction.z == 0.0f ? 0.0 : rdinv.z;
+
 	glm::vec3 tmax;
 	tmax.x = direction.x != 0.f ? (cb.x - origin.x) * rdinv.x : 1000000.f;
 	tmax.y = direction.y != 0.f ? (cb.y - origin.y) * rdinv.y : 1000000.f;
 	tmax.z = direction.z != 0.f ? (cb.z - origin.z) * rdinv.z : 1000000.f;
+
 	glm::vec3 tdelta = step * rdinv;
 
 	int step_axis = -1;
@@ -291,6 +297,9 @@ enum kleurtjes {
 //	step.z = direction.z > 0.f ? 1.f : -1.f;
 //
 //	glm::vec3 rdinv = 1.f / direction;
+// 	rdinv.x = direction.x == 0.0f ? 0.0 : rdinv.x;
+//  rdinv.y = direction.y == 0.0f ? 0.0 : rdinv.y;
+//  rdinv.z = direction.z == 0.0f ? 0.0 : rdinv.z;
 //	glm::vec3 tdelta = step * rdinv;
 //	if (isinf(tdelta.x)) {
 //		tdelta.x = 0;

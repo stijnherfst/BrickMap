@@ -38,14 +38,11 @@ void Camera::handle_input(GLFWwindow* window, double delta) {
 	int w, h;
 	glfwGetWindowSize(window, &w, &h);
 
-	const double diffx = x - w * 0.5;
-	const double diffy = y - h * 0.5;
+	aspect_ratio = static_cast<float>(w) / static_cast<float>(h);
 
-	horizontal_angle += diffx * 0.012;
-	vertical_angle -= diffy * 0.012;
+	horizontal_angle = x / w * 10.0;
+	vertical_angle = -y / h * 10.0;
 	vertical_angle = std::max(-pi / 2.0 + 0.001, std::min(vertical_angle, pi / 2.0 - 0.001));
-
-	glfwSetCursorPos(window, w * 0.5, h * 0.5);
 }
 
 void Camera::update() {

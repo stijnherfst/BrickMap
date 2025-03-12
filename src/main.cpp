@@ -4,6 +4,9 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <state.h>
+#include <launch.h>
+
 //#define PERFORMANCE_TEST
 
 static void glfw_error_callback(int error, const char* description) {
@@ -43,7 +46,8 @@ int main(int argc, char* argv[]) {
 
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	window = glfwCreateWindow(render_width, render_height, "CUDA Path Tracer", nullptr, nullptr);
+	window = glfwCreateWindow(1920, 1080, "CUDA Path Tracer", nullptr, nullptr);
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	if (!window) {
 		glfwTerminate();
@@ -51,12 +55,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	glfwMakeContextCurrent(window);
-
-
-	// Center cursor
-	int w, h;
-	glfwGetWindowSize(window, &w, &h);
-	glfwSetCursorPos(window, w * 0.5, h * 0.5);
 
 	gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
@@ -71,13 +69,10 @@ int main(int argc, char* argv[]) {
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
 	(void)io;
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
 
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init();
 
-	// Setup style
 	ImGui::StyleColorsDark();
 
 	// CUDA setup
@@ -101,29 +96,22 @@ int main(int argc, char* argv[]) {
 	printf("CUDA : %-24s (%2d)\n", props.name, props.multiProcessorCount);
 	sm_cores = props.multiProcessorCount;
 
-	cuda_interop interop;
-
 	int width, height;
 	glfwGetFramebufferSize(window, &width, &height);
-	cuda_err = interop.set_size(width, height);
+	
+	State state(width, height);
+
+	glfwSetWindowUserPointer(window, &state);
+
+	glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height) {
+		auto state = reinterpret_cast<State*>(glfwGetWindowUserPointer(window));
+		state->screen_resize(width, height);
+	});
 
 	glfwSetKeyCallback(window, glfw_key_callback);
 
 	Scene scene;
 	scene.generate();
-
-	// Allocate ray queue buffer
-	RayQueue* ray_buffer_work;
-	cuda(Malloc(&ray_buffer_work, ray_queue_buffer_size * sizeof(RayQueue)));
-
-	RayQueue* ray_buffer_next;
-	cuda(Malloc(&ray_buffer_next, ray_queue_buffer_size * sizeof(RayQueue)));
-
-	ShadowQueue* shadow_queue_buffer;
-	cuda(Malloc(&shadow_queue_buffer, ray_queue_buffer_size * sizeof(ShadowQueue)));
-
-	glm::vec4* blit_buffer;
-	cuda(Malloc(&blit_buffer, render_width * render_height * sizeof(glm::vec4)));
 
 	double previous_time = glfwGetTime();
 	while (!glfwWindowShouldClose(window)) {
@@ -151,12 +139,12 @@ int main(int argc, char* argv[]) {
 
 		camera.update();
 
-		launch_kernels(interop.ca, blit_buffer, scene.gpuScene, ray_buffer_work, ray_buffer_next, shadow_queue_buffer);
+		launch_kernels(state, state.interop.surf, state.blit_buffer, scene.gpuScene, state.ray_buffer_work, state.ray_buffer_next, state.shadow_queue_buffer);
 
 		scene.process_load_queue();
 
-		std::swap(ray_buffer_work, ray_buffer_next);
-		interop.blit();
+		std::swap(state.ray_buffer_work, state.ray_buffer_next);
+		state.interop.blit();
 
 		// IMGUI
 		ImGui_ImplOpenGL3_NewFrame();
