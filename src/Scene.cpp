@@ -180,6 +180,20 @@ void Scene::generate() {
 	cuda(Malloc(&gpuScene.indices, gpu_superindices.size() * sizeof(uint32_t*)));
 	cuda(Memcpy(gpuScene.indices, gpu_superindices.data(), gpu_superindices.size() * sizeof(uint32_t*), cudaMemcpyKind::cudaMemcpyHostToDevice));
 
+	std::vector<uint32_t> supercell_empty(supergrid.size());
+	for (size_t i = 0; i < supergrid.size(); i++) {
+		uint32_t empty = 1;
+		for (uint32_t index : supergrid[i]->indices) {
+			if (index & brick_loaded_bit) {
+				empty = 0;
+				break;
+			}
+		}
+		supercell_empty[i] = empty;
+	}
+	cuda(Malloc(&gpuScene.supercell_empty, supercell_empty.size() * sizeof(uint32_t)));
+	cuda(Memcpy(gpuScene.supercell_empty, supercell_empty.data(), supercell_empty.size() * sizeof(uint32_t), cudaMemcpyKind::cudaMemcpyHostToDevice));
+
 	cuda(Malloc(&gpuScene.brick_load_queue_count, 4));
 	cuda(Memset(gpuScene.brick_load_queue_count, 0, 4));
 

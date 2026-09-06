@@ -9,6 +9,8 @@ public:
 	struct GPUScene {
 		uint32_t** indices;
 		Brick** bricks;
+		// One flag per supercell for when it contains no geometry at all
+		uint32_t* supercell_empty;
 		glm::ivec3* brick_load_queue;
 		uint32_t* brick_load_queue_count;
 
