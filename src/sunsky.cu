@@ -67,8 +67,8 @@ __device__ glm::vec3 sun(glm::vec3 viewDir) {
 			   glm::clamp(pow(1.0f - dot(up, sunDirection), 5.0f), 0.0f, 1.0f));
 
 	// composition + solar disc
-	float sundisk = sunAngularDiameterCos < (cosViewSunAngle ? 1.0 : 0.0);
-	glm::vec3 sun = (sunE * 19000.0f * Fex) * sundisk;
+	const float sundisk = cosViewSunAngle >= sunAngularDiameterCos ? 1.0f : 0.0f;
+	const glm::vec3 sun = (sunE * 19000.0f * Fex) * sundisk;
 
 	return 0.01f * sun;
 }
@@ -118,9 +118,6 @@ __device__ glm::vec3 sunsky(glm::vec3 viewDir) {
 	float cosViewSunAngle = dot(viewDir, sunDirection);
 	float cosSunUpAngle = dot(sunDirection, up);
 	float cosUpViewAngle = dot(up, viewDir);
-	if (sunAngularDiameterCos == 1.0f) {
-		return glm::vec3(1.0f, 0.0f, 0.0f);
-	}
 	float sunE = SunIntensity(cosSunUpAngle); // Get sun intensity based on how high in
 		// the sky it is extinction (asorbtion + out
 		// scattering) rayleigh coeficients
@@ -153,11 +150,11 @@ __device__ glm::vec3 sunsky(glm::vec3 viewDir) {
 					glm::clamp(pow(1.0f - dot(up, sunDirection), 5.0f), 0.0f, 1.0f));
 
 	// composition + solar disc
-	float sundisk = glm::smoothstep(
+	const float sundisk = glm::smoothstep(
 		sunAngularDiameterCos, sunAngularDiameterCos + 0.00002f, cosViewSunAngle);
-	glm::vec3 sun = (sunE * 19000.0f * Fex) * sundisk * 1E-5f;
+	const glm::vec3 sun = (sunE * 19000.0f * Fex) * sundisk * sun_disc_exposure;
 
-	return 0.01f * (sun + sky);
+	return 0.01f * (sun + SkyFactor * sky);
 }
 
 __device__ glm::vec3 ortho(glm::vec3 v) {

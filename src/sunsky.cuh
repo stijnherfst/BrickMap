@@ -26,7 +26,7 @@ constexpr float sunSize = 1.5;
 
 constexpr float cutoffAngle = pi / 1.95f;
 constexpr float steepness = 1.5;
-constexpr float SkyFactor = 1.f;
+constexpr float SkyFactor = 100.f;
 constexpr float turbidity = 1;
 constexpr float mieCoefficient = 0.005f;
 constexpr float mieDirectionalG = 0.80f;
@@ -38,6 +38,8 @@ constexpr float rayleighZenithLength = 8.4E3;
 constexpr float mieZenithLength = 1.25E3;
 
 constexpr float sunIntensity = 1000.0;
+
+constexpr float sun_disc_exposure = 6.85E-4f;
 
 constexpr glm::vec3 primaryWavelengths = glm::vec3(680E-9, 550E-9, 450E-9);
 
