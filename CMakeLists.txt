@@ -16,8 +16,7 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(soil2 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
-
-set(CMAKE_CUDA_ARCHITECTURES 61)
+find_package(CUDAToolkit REQUIRED)
 
 add_executable(Brickmap
 	"src/assert_cuda.cpp"
@@ -57,10 +56,10 @@ target_link_libraries(Brickmap PRIVATE
 	glm::glm
 	soil2
 	imgui::imgui
+	CUDA::cudart
 )
 
-target_include_directories(Brickmap PRIVATE 
-	${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
+target_include_directories(Brickmap PRIVATE
 	"src/"
 )
 set_target_properties(Brickmap PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -68,6 +67,8 @@ set_target_properties(Brickmap PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 # Surpress 20012 as it emits a lot of errors in GLM
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --expt-relaxed-constexpr -Xcudafe --diag_suppress=20012")
+
+target_compile_definitions(Brickmap PRIVATE GLM_FORCE_CXX20)
 
 target_compile_options(Brickmap PRIVATE                        
 	$<$<COMPILE_LANGUAGE:CXX>:/arch:AVX2>
