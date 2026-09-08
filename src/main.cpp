@@ -139,11 +139,10 @@ int main(int argc, char* argv[]) {
 
 		camera.update();
 
-		launch_kernels(state, state.interop.surf, state.blit_buffer, scene.gpuScene, state.ray_buffer_work, state.ray_buffer_next, state.shadow_queue_buffer);
+		launch_kernels(state, state.interop.surf, state.blit_buffer, scene.gpuScene, state.shadow_queue_buffer);
 
 		scene.process_load_queue();
 
-		std::swap(state.ray_buffer_work, state.ray_buffer_next);
 		state.interop.blit();
 
 		// IMGUI

@@ -11,6 +11,7 @@
 
 constexpr float VERY_FAR = 1e20f;
 constexpr int MAX_BOUNCES = 3;
+constexpr int wavefront_iterations = MAX_BOUNCES + 1;
 
 constexpr float exposure = 1.f / 68.5f;
 
@@ -79,14 +80,6 @@ __device__ glm::vec2 Random2DStratifiedSample(unsigned int& seed) {
 	const float randomPointInStratumY = stratumYStart + (RandomFloat(seed) * pixelHeight);
 	return glm::vec2(randomPointInStratumX, randomPointInStratumY);
 }
-
-enum Refl_t {
-	DIFF,
-	SPEC,
-	REFR,
-	PHONG,
-	LIGHT
-};
 
 /*
 	Given a direction unit vector W, computes two other vectors U and V which
@@ -415,15 +408,7 @@ __global__ void blit_onto_framebuffer(glm::vec4* blit_buffer, cudaSurfaceObject_
 	surf2Dwrite(cuda::std::bit_cast<float4>(gamma_corrected), texture, x * sizeof(glm::vec4), y, cudaBoundaryModeZero);
 }
 
-cudaError launch_kernels(
-	State& state,
-	cudaSurfaceObject_t surf,
-	glm::vec4* blit_buffer,
-	Scene::GPUScene scene,
-	RayQueue* ray_buffer,
-	RayQueue* ray_buffer_next,
-	ShadowQueue* shadow_queue
-) {
+cudaError launch_kernels(State& state, cudaSurfaceObject_t surf, glm::vec4* blit_buffer, Scene::GPUScene scene, ShadowQueue* shadow_queue) {
 	static bool first_time = true;
 	static bool reset_buffer = false;
 	static unsigned int frame = 1;
@@ -477,29 +462,35 @@ cudaError launch_kernels(
 		cuda(Memset(scene.brick_load_queue_count, 0, 4));
 	}
 
-	primary_rays<<<sm_cores * blocks_primary, 128, 0, kernel_stream>>>(
-		ray_buffer,
-		camera_right,
-		camera_up,
-		lens_right,
-		lens_up,
-		camera.direction,
-		camera.position,
-		frame,
-		camera.focalDistance,
-		camera.lensRadius,
-		scene,
-		blit_buffer,
-		camera.position,
-		state.screen_width,
-		state.screen_height
-	);
-	set_wavefront_globals<<<1, 1, 0, kernel_stream>>>(state.screen_width, state.screen_height);
-	extend<<<sm_cores * blocks_extend, 128, 0, kernel_stream>>>(ray_buffer, scene, camera.position / 8.f);
-	shade<<<sm_cores * blocks_shade, 128, 0, kernel_stream>>>(ray_buffer, ray_buffer_next, shadow_queue, scene, blit_buffer, frame);
-	connect<<<sm_cores * blocks_connect, 128, 0, kernel_stream>>>(shadow_queue, scene, blit_buffer, camera.position / 8.f);
+	for (int i = 0; i < wavefront_iterations; i++) {
+		primary_rays<<<sm_cores * blocks_primary, 128, 0, kernel_stream>>>(
+			state.ray_buffer_work,
+			camera_right,
+			camera_up,
+			lens_right,
+			lens_up,
+			camera.direction,
+			camera.position,
+			frame,
+			camera.focalDistance,
+			camera.lensRadius,
+			scene,
+			blit_buffer,
+			camera.position,
+			state.screen_width,
+			state.screen_height
+		);
+		set_wavefront_globals<<<1, 1, 0, kernel_stream>>>(state.screen_width, state.screen_height);
+		extend<<<sm_cores * blocks_extend, 128, 0, kernel_stream>>>(state.ray_buffer_work, scene, camera.position / 8.f);
+		shade<<<sm_cores * blocks_shade, 128, 0, kernel_stream>>>(
+			state.ray_buffer_work, state.ray_buffer_next, shadow_queue, scene, blit_buffer, frame
+		);
+		connect<<<sm_cores * blocks_connect, 128, 0, kernel_stream>>>(shadow_queue, scene, blit_buffer, camera.position / 8.f);
 
-	frame++;
+		frame++;
+
+		std::swap(state.ray_buffer_work, state.ray_buffer_next);
+	}
 
 	dim3 threads = dim3(16, 16, 1);
 	dim3 blocks = dim3((state.screen_width + threads.x - 1) / threads.x, (state.screen_height + threads.y - 1) / threads.y, 1);
